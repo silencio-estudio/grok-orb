@@ -1,6 +1,8 @@
 # Grok Bot ESP32 Companion · 小糖 AI 陪伴宠物
 
-[English](README.en.md) · [快速开始](docs/GETTING_STARTED.zh-CN.md) · [实体按键语音入口](docs/VOICE_INPUT.md) · [架构](docs/宠物固件架构.md) · [验收与限制](docs/VALIDATION.md) · [贡献指南](CONTRIBUTING.md)
+[English](README.en.md) · [快速开始](docs/GETTING_STARTED.zh-CN.md) · [实体按键语音入口](docs/VOICE_INPUT.md) · [架构](docs/宠物固件架构.md) · [验收与限制](docs/VALIDATION.md) · [贡献指南](CONTRIBUTING.md) · [1.75C 移植（西班牙语）](docs/PORT_1.75C.md)
+
+> **Grok Orb 分支：** 本分支新增 **Waveshare ESP32-S3-Touch-AMOLED-1.75C** 板级移植（尚未实机验证）以及西班牙语语音与界面，时区可配置（默认 Europe/Madrid）。详见 [docs/PORT_1.75C.md](docs/PORT_1.75C.md)。原项目：[vliuyt/grok-bot-esp32-bridge](https://github.com/vliuyt/grok-bot-esp32-bridge)。
 
 把 **微雪 ESP32-S3-Touch-AMOLED-1.43C** 变成一个会眨眼、会回应抚摸、可以按住说话的桌面 AI 小宠物。设备运行独立宠物固件，Mac 负责桥接你已有的 Grok Bot；保留 Bot 的原生声音、上下文和任务能力。
 
@@ -92,7 +94,7 @@ docs/                    从零使用、架构、协议、排错和验收边界
 - 最多缓存约 180 秒未播放音频，超限会取消并重连，不恢复旧回答。
 - 持久化同次通话历史是任务结果来源；仅存在于瞬时 SSE 的特殊通知尚未验证。
 - 桥接页面的「挂断」暂停接入，但程序重启后不保留暂停状态；夜间可用停止脚本停用服务。
-- 主动行为时钟目前固定上海时区（UTC+8），未提供地区设置。
+- 主动行为时钟跟随桥接端时区（`GROK_TIMEZONE`，本分支默认 `Europe/Madrid`；旧版桥接仍为 UTC+8）。
 - 清醒／困倦共用 30 fps 回调，尚无实测电流与续航结论。
 
 后续优先完善实物验收、可重复的预编译发行、配网体验和功耗。计划见 [ROADMAP](docs/ROADMAP.md)，欢迎提交复现步骤或参与开发。

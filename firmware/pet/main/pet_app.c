@@ -147,8 +147,8 @@ static void refresh(void){
     ui.pose=pet_pose(&s,now);ui.dialogue=s.dialogue;ui.connection=s.connection;
     ui.volume=c.volume;ui.brightness=c.brightness;ui.quiet=c.quiet;ui.captions=c.captions;ui.speaker=c.speaker;
     ui.task_channel=s.task_channel;ui.waiting_long=s.dialogue==PET_DIALOGUE_WAIT&&now-s.entered_ms>=20000;
-    snprintf(ui.mac,sizeof(ui.mac),"%s",mac_connected?"Mac 桥接已连接":network_connected?"正在寻找已配对 Mac":"等待网络连接");
-    snprintf(ui.voice,sizeof(ui.voice),"%s",s.connection==PET_CONN_READY?(s.task_channel?"小糖原生语音就绪":"语音可用，任务通道恢复中"):"小糖原生语音尚未就绪");
+    snprintf(ui.mac,sizeof(ui.mac),"%s",mac_connected?"Puente del Mac conectado":network_connected?"Buscando el Mac emparejado":"Esperando la red");
+    snprintf(ui.voice,sizeof(ui.voice),"%s",s.connection==PET_CONN_READY?(s.task_channel?"Voz nativa lista":"Voz lista; recuperando tareas"):"Voz nativa aún no lista");
     pet_ui_view_t current=ui;xSemaphoreGive(metadata_lock);
     pet_ui_update(&current);pet_config_wipe(&c,sizeof(c));
 }
@@ -159,8 +159,8 @@ int pet_app_status(char *out,size_t cap,bool compact){
             s.connection==PET_CONN_READY?"true":"false",a.recording?"true":"false",(unsigned)s.turn,(unsigned)a.played_frames,(unsigned)s.generation,a.queued);
     }else {
         xSemaphoreTake(metadata_lock,portMAX_DELAY);bool wifi=network_connected;xSemaphoreGive(metadata_lock);
-        n=snprintf(out,cap,"{\"board\":\"Waveshare ESP32-S3-Touch-AMOLED-1.43C\",\"app\":\"grok-pet\",\"device\":{\"volume\":%u,\"speaker\":%s,\"mic_gain\":%u,\"wifi\":{\"state\":\"%s\"},\"link\":{\"paired\":%s,\"state\":\"%s\"},\"hatch\":{\"state\":\"%s\"}},\"pet\":{\"life\":%d,\"dialogue\":%d,\"generation\":%u,\"turn\":%u,\"heap\":%u,\"psram\":%u,\"audioFault\":%s,\"uptimeMs\":%llu,\"connection\":%d,\"linkFlags\":%u,\"loopMs\":%llu,\"phase\":%u,\"urgentDepth\":%u,\"emergencyReasons\":%u,\"eventDrops\":%u,\"stackConsole\":%u,\"stackNetwork\":%u}}",
-            c.volume,c.speaker?"true":"false",c.mic_gain,wifi?"connected":"disconnected",c.bridge_paired?"true":"false",
+        n=snprintf(out,cap,"{\"board\":\"%s\",\"app\":\"grok-pet\",\"device\":{\"volume\":%u,\"speaker\":%s,\"mic_gain\":%u,\"wifi\":{\"state\":\"%s\"},\"link\":{\"paired\":%s,\"state\":\"%s\"},\"hatch\":{\"state\":\"%s\"}},\"pet\":{\"life\":%d,\"dialogue\":%d,\"generation\":%u,\"turn\":%u,\"heap\":%u,\"psram\":%u,\"audioFault\":%s,\"uptimeMs\":%llu,\"connection\":%d,\"linkFlags\":%u,\"loopMs\":%llu,\"phase\":%u,\"urgentDepth\":%u,\"emergencyReasons\":%u,\"eventDrops\":%u,\"stackConsole\":%u,\"stackNetwork\":%u}}",
+            pet_board()->name,c.volume,c.speaker?"true":"false",c.mic_gain,wifi?"connected":"disconnected",c.bridge_paired?"true":"false",
             s.connection==PET_CONN_READY?"Online":"Connecting",s.connection==PET_CONN_READY?"Connected":"Waiting",
             s.life,s.dialogue,(unsigned)s.generation,(unsigned)s.turn,(unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),a.fault?"true":"false",(unsigned long long)now_ms(),s.connection,pet_link_flags(),(unsigned long long)s.now_ms,atomic_load(&phase),(unsigned)uxQueueMessagesWaiting(urgent),atomic_load(&emergency_reasons),atomic_load(&event_drops),pet_console_stack_free(),pet_network_stack_free());
@@ -194,17 +194,17 @@ void app_main(void){
     if(pet_board_init()!=ESP_OK){ESP_LOGE("pet","BOARD_START_FAILED");return;}
     pet_init(&model,now_ms());model.seed=esp_random()|1u;model.quiet=config.quiet;model.muted=!config.speaker;
     model.day=config.quota_day;model.greetings_today=config.quota_count;
-    ui.battery=-1;snprintf(ui.wifi,sizeof(ui.wifi),"Wi-Fi 正在准备");snprintf(ui.setup,sizeof(ui.setup),"可从此处开启蓝牙配网");
+    ui.battery=-1;snprintf(ui.wifi,sizeof(ui.wifi),"Preparando Wi-Fi");snprintf(ui.setup,sizeof(ui.setup),"Desde aquí: configurar por Bluetooth");
     pet_console_start();
     if(pet_ui_start(ui_action,NULL)!=ESP_OK){ESP_LOGE("pet","UI_START_FAILED");return;}
     pet_audio_callbacks_t audio_cb={.event=audio_event,.capture=capture,.stopped=stopped,.credit=credit,.fault=audio_fault};
     if(pet_audio_start(&config,audio_cb)!=ESP_OK){ESP_LOGE("pet","AUDIO_START_FAILED");}
     pet_provision_callbacks_t provisioning={.current=current_config,.status=setup_status,.window=setup_window};
-    if(pet_provision_start(provisioning)!=ESP_OK)pet_app_setup_status("蓝牙不可用，可用 USB 配网",0);
+    if(pet_provision_start(provisioning)!=ESP_OK)pet_app_setup_status("Sin Bluetooth: configura por USB",0);
     pet_network_callbacks_t networking={.current=current_config,.commit=commit_network,.status=network_status,.result=network_result};
-    if(pet_network_start(networking)!=ESP_OK)pet_app_network(false,"Wi-Fi 启动失败，离线互动可用");
+    if(pet_network_start(networking)!=ESP_OK)pet_app_network(false,"Wi-Fi no arrancó (funciona sin red)");
     pet_app_bind_transport((pet_transport_t){.control=pet_link_control,.capture=pet_link_capture,.credit=pet_link_credit,.reconnect=pet_link_reconnect,.sleep=pet_link_sleep});
-    if(pet_link_start((pet_link_callbacks_t){.config=current_config,.state=link_state,.event=link_event,.caption=link_caption,.status=link_status})!=ESP_OK)pet_app_setup_status("语音连接启动失败",0);
+    if(pet_link_start((pet_link_callbacks_t){.config=current_config,.state=link_state,.event=link_event,.caption=link_caption,.status=link_status})!=ESP_OK)pet_app_setup_status("No arrancó la conexión de voz",0);
     bool asleep=false,network_asleep=false;
     for(;;){
         uint64_t now=now_ms();
@@ -239,7 +239,7 @@ void app_main(void){
         }
         if(dirty&&now-dirty_at>=1500&&s.dialogue==PET_DIALOGUE_IDLE){
             xSemaphoreTake(config_lock,portMAX_DELAY);pet_config_t c=config;
-            if(pet_store_save(&c)){dirty=false;}else {dirty_at=now;pet_app_setup_status("设置保存失败，可重试",0);}
+            if(pet_store_save(&c)){dirty=false;}else {dirty_at=now;pet_app_setup_status("No se guardaron los ajustes; reintenta",0);}
             pet_config_wipe(&c,sizeof(c));xSemaphoreGive(config_lock);
         }
         atomic_store(&phase,30);refresh();atomic_store(&phase,31);vTaskDelay(pdMS_TO_TICKS(10));

@@ -3,9 +3,10 @@ import { NativeBotSession } from './native-bot.mjs';
 import { PcmResampler, validatePcm } from './audio.mjs';
 import { encodeFrame, FrameDecoder, PlaybackQueue } from './device-wire.mjs';
 import { petMessage,encodePetMessage,shortCaption,privateLanPeer,bridgeIdentity } from './pet-protocol.mjs';
+import { bridgeLocale, utcOffsetMinutes } from './locale.mjs';
 
 export async function startDeviceServer({ backend, bot, key, host = '0.0.0.0', port = 8790,bridgeId,
-  sessionFactory = () => new NativeBotSession({ backend, bot }) }) {
+  timeZone = bridgeLocale().timeZone, sessionFactory = () => new NativeBotSession({ backend, bot }) }) {
   if (!Buffer.isBuffer(key) || key.length !== 32) throw new Error('INVALID_PAIRING_KEY');
   bridgeId ??= bridgeIdentity(key.toString('hex'));
   let active, connections = 0, paused = false, stopping = false;
@@ -105,8 +106,8 @@ export async function startDeviceServer({ backend, bot, key, host = '0.0.0.0', p
         if(message?.op!=='hello'||!bridgeId||call.petGeneration)throw new Error('PET_PROTOCOL');
         call.petGeneration=message.generation;stats.petProtocol=2;diagnostic("PET_HELLO");
         metadata({op:'hello',v:2,bridgeId});metadata({op:'link',state:call.ready?'ready':'connecting'});
-        metadata({op:'clock',epochMs:Date.now()});
-        call.clockTimer=setInterval(()=>{try{metadata({op:'clock',epochMs:Date.now()});}catch(error){fail(error.message);}},30000);call.clockTimer.unref();
+        const clock=()=>{const epochMs=Date.now();metadata({op:'clock',epochMs,offsetMin:utcOffsetMinutes(timeZone,epochMs)});};
+        clock();call.clockTimer=setInterval(()=>{try{clock();}catch(error){fail(error.message);}},30000);call.clockTimer.unref();
         if(typeof stats.taskReturnAvailable==='boolean')metadata({op:'task_channel',available:stats.taskReturnAvailable});
         return;
       }

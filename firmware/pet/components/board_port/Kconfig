@@ -1,0 +1,20 @@
+menu "Grok pet board"
+    choice PET_BOARD
+        prompt "Target board"
+        default PET_BOARD_WAVESHARE_143C
+        help
+            Board port linked into the pet firmware. Each board also needs its
+            own flash size and partition table; build with
+            firmware/tools/build_pet.py --board, which applies them.
+
+        config PET_BOARD_WAVESHARE_143C
+            bool "Waveshare ESP32-S3-Touch-AMOLED-1.43C"
+        config PET_BOARD_WAVESHARE_175C
+            bool "Waveshare ESP32-S3-Touch-AMOLED-1.75C"
+    endchoice
+
+    config PET_BOARD_SHORT_NAME
+        string
+        default "1.75C" if PET_BOARD_WAVESHARE_175C
+        default "1.43C"
+endmenu

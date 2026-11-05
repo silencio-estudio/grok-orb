@@ -80,8 +80,12 @@ static bool metadata(const void *bytes,size_t n){
  }else if(!strcmp(op,"clock")){
   cJSON *v=cJSON_GetObjectItemCaseSensitive(j,"epochMs");
   if(!cJSON_IsNumber(v)||v->valuedouble<1700000000000.0||v->valuedouble>4102444800000.0){ok=false;goto done;}
-  time_t seconds=(time_t)(v->valuedouble/1000)+8*3600;struct tm shanghai;gmtime_r(&seconds,&shanghai);
-  cb.event((pet_event_t){.kind=PET_EV_CLOCK,.now_ms=now_ms(),.day=(uint32_t)(shanghai.tm_year+1900)*10000+(uint32_t)(shanghai.tm_mon+1)*100+(uint32_t)shanghai.tm_mday,.value=shanghai.tm_hour*60+shanghai.tm_min},cb.context);
+  /* offsetMin: desfase UTC de la zona horaria del puente (con horario de verano).
+   * Un puente antiguo sin él sigue con la hora de Shanghái del proyecto original. */
+  cJSON *o=cJSON_GetObjectItemCaseSensitive(j,"offsetMin");int offset=8*60;
+  if(o){if(!cJSON_IsNumber(o)||o->valuedouble!=(double)(int)o->valuedouble||o->valuedouble<-840||o->valuedouble>840){ok=false;goto done;}offset=(int)o->valuedouble;}
+  time_t seconds=(time_t)(v->valuedouble/1000)+offset*60;struct tm local;gmtime_r(&seconds,&local);
+  cb.event((pet_event_t){.kind=PET_EV_CLOCK,.now_ms=now_ms(),.day=(uint32_t)(local.tm_year+1900)*10000+(uint32_t)(local.tm_mon+1)*100+(uint32_t)local.tm_mday,.value=local.tm_hour*60+local.tm_min},cb.context);
  }else ok=false;
  done:cJSON_Delete(j);return ok;
 }

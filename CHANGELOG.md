@@ -1,5 +1,13 @@
 # Changelog
 
+## Sin publicar — port a la 1.75C y español (Grok Orb)
+
+- Board port para la Waveshare ESP32-S3-Touch-AMOLED-1.75C (CO5300, CST9217, ES8311/ES7210, AXP2101, BOOT), seleccionable con `build_pet.py --board 175c`; la 1.43C sigue igual y por defecto.
+- Tabla `partitions_175c.csv` y perfil del instalador para 16/32 MiB: copia completa verificada, primera instalación del área de arranque solo sobre la placa copiada y sin cambios, actualizaciones solo de la aplicación y restauración completa.
+- Voz, textos de la pantalla y páginas del Mac en español; fuente Montserrat con Latin-1.
+- Zona horaria configurable (`GROK_TIMEZONE`, `Europe/Madrid` por defecto), también en el reloj de la placa (`offsetMin`).
+- Sin probar en hardware: ver `docs/PORT_1.75C.md`.
+
 ## 0.1.1 — 2026-10-19
 
 - Keep voice on the physical BOOT button: hold to record, release to submit, hold again to interrupt.

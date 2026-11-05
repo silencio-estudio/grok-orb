@@ -33,7 +33,8 @@ export function petMessage(payload,{generation,turn}={}){
       return {...common,turn:m.turn,id:m.id,text:m.text};
     case 'clock':
       if(!Number.isSafeInteger(m.epochMs)||m.epochMs<1700000000000||m.epochMs>4102444800000)throw new Error('PET_PROTOCOL');
-      return {...common,epochMs:m.epochMs};
+      if(m.offsetMin!==undefined&&(!Number.isInteger(m.offsetMin)||m.offsetMin<-840||m.offsetMin>840))throw new Error('PET_PROTOCOL');
+      return {...common,epochMs:m.epochMs,...(m.offsetMin!==undefined?{offsetMin:m.offsetMin}:{})};
     case 'link':
       if(!['connecting','ready','unavailable'].includes(m.state))throw new Error('PET_PROTOCOL');
       return {...common,state:m.state};

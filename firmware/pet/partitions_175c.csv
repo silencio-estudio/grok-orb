@@ -1,0 +1,10 @@
+# Name,    Type, SubType, Offset,   Size,     Flags
+# Waveshare ESP32-S3-Touch-AMOLED-1.75C. Same table offset (0x10000) and
+# first sectors as the 1.43C layout, so the installer's guards apply to both;
+# two 6 MiB app slots end at 0xC20000, inside 16 MiB, so the layout fits
+# both 16 MiB and 32 MiB flash. The remaining flash is left untouched.
+nvs,       data, nvs,     0x11000,  0xC000,
+otadata,   data, ota,     0x1D000,  0x2000,
+phy_init,  data, phy,     0x1F000,  0x1000,
+ota_0,     app,  ota_0,   0x20000,  0x600000,
+ota_1,     app,  ota_1,   0x620000, 0x600000,
