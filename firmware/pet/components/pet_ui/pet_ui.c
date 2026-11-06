@@ -25,6 +25,9 @@ static lv_obj_t *root,*body,*eyes[2],*smiles[2],*caption,*handle,*drawer,*connec
 static lv_obj_t *volume_slider,*brightness_slider,*quiet_switch,*captions_switch,*speaker_switch;
 static lv_obj_t *network_label,*bridge_label,*voice_label,*setup_label,*passkey_label,*power_label;
 static bool initialized,screen_on=true,syncing;
+/* Últimos valores enviados: los estilos de transformación de LVGL invalidan el objeto
+ * aunque no cambien, y el brillo es un comando por QSPI. Valores imposibles = aún no enviado. */
+static int last_brightness=-1,last_w=-1,last_h=-1,last_rotation=-100000;
 static int page,requested_page=-1;
 static bool snapshot_requested;
 static int touch_x,touch_y;
@@ -123,15 +126,18 @@ static void draw(lv_timer_t *timer){
     pet_pose_t p=current.pose;
     if(p.screen_on!=screen_on){
         screen_on=p.screen_on;pet_board()->panel_sleep(!screen_on);
-        if(screen_on)lv_obj_invalidate(root);
+        if(screen_on){lv_obj_invalidate(root);last_brightness=-1;}
     }
     if(!screen_on){if(snap)snapshot();return;}
     int brightness=p.dim?current.brightness/4:current.brightness;
-    pet_board()->set_brightness(brightness<5?5:brightness);
-    int w=(int)(224*p.scale_x),h=(int)(224*p.scale_y);
+    if(brightness<5)brightness=5;
+    if(brightness!=last_brightness){last_brightness=brightness;pet_board()->set_brightness(brightness);}
+    int w=(int)(224*p.scale_x),h=(int)(224*p.scale_y),rotation=(int)(p.rotation*10);
     lv_obj_set_size(body,w,h);lv_obj_set_pos(body,(466-w)/2,210-h/2+(int)p.offset_y);
-    lv_obj_set_style_transform_pivot_x(body,w/2,0);lv_obj_set_style_transform_pivot_y(body,h/2,0);
-    lv_obj_set_style_transform_rotation(body,(int)(p.rotation*10),0);
+    if(w!=last_w||h!=last_h){
+        last_w=w;last_h=h;lv_obj_set_style_transform_pivot_x(body,w/2,0);lv_obj_set_style_transform_pivot_y(body,h/2,0);
+    }
+    if(rotation!=last_rotation){last_rotation=rotation;lv_obj_set_style_transform_rotation(body,rotation,0);}
     bool happy=p.expression==PET_EXPR_HAPPY||p.expression==PET_EXPR_SLEEP;
     for(unsigned i=0;i<2;i++){
         int x=(int)(w*(i?.5223f:.2411f))+(int)p.look_x;
@@ -213,7 +219,8 @@ static void build(void){
     lv_obj_t *stop=button(connection_page,PET_STR_SETUP_CLOSE,200,close_provision);lv_obj_set_pos(stop,133,345);
     back=button(connection_page,PET_STR_BACK_HOME,120,home);lv_obj_set_pos(back,173,396);
     power_label=label(drawer,"",130);lv_obj_set_pos(power_label,168,28);
-    lv_timer_create(draw,33,NULL);
+    /* Un dibujo por refresco de pantalla (33 ms en la placa, CONFIG_LV_DEF_REFR_PERIOD). */
+    lv_timer_create(draw,LV_DEF_REFR_PERIOD,NULL);
 }
 static void ui_task(void *unused){
     (void)unused;/* Montserrat 16 de LVGL solo trae ASCII: tildes, ñ, ¿ y ¡ salen de la
