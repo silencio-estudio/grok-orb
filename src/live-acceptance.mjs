@@ -6,14 +6,15 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { loadAuth } from './auth.mjs';
 import { Backend } from './backend.mjs';
 import { NativeBotSession } from './native-bot.mjs';
-import { DEFAULT_BOT } from './locale.mjs';
+import { DEFAULT_BOT, bridgeLocale } from './locale.mjs';
+// Frases de prueba aún en chino: la voz se fija a zh hasta traducirlas (fase 7 de docs/PORT-1.75C.md).
 import { MacAudio, projectRoot } from './mac-audio.mjs';
 
 const run = promisify(execFile);
 const backend = new Backend(await loadAuth());
 const bots = await backend.listBots(); const matches = bots.filter(bot => bot.name === (process.env.GROK_BOT_NAME ?? DEFAULT_BOT));
 if (matches.length !== 1) throw new Error('BOT_NOT_UNIQUE');
-const session = new NativeBotSession({ backend, bot: matches[0] });
+const session = new NativeBotSession({ backend, bot: matches[0], locale: bridgeLocale({ ...process.env, GROK_LANGUAGE: 'zh' }) });
 const audio = new MacAudio(); let audioBytes = 0, taskReturns = 0, toolCalls = 0, faults = [], transcript = [], stats = [];
 session.on('audio', pcm => { audioBytes += pcm.length; audio.play(pcm); });
 session.on('clearAudio', () => audio.clear());

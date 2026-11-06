@@ -6,7 +6,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { loadAuth } from './auth.mjs';
 import { Backend } from './backend.mjs';
 import { NativeBotSession } from './native-bot.mjs';
-import { DEFAULT_BOT } from './locale.mjs';
+import { DEFAULT_BOT, bridgeLocale } from './locale.mjs';
+// Frases de prueba aún en chino: la voz se fija a zh hasta traducirlas (fase 7 de docs/PORT-1.75C.md).
 import { startDeviceServer } from './device-server.mjs';
 import { deviceConfig } from './device-config.mjs';
 import { projectRoot } from './mac-audio.mjs';
@@ -18,7 +19,7 @@ if(matches.length!==1) throw new Error('BOT_NOT_UNIQUE');
 const config=await deviceConfig();
 let session, available=false, returned=0, spoken=false, audioBytes=0, saved, serialWaiter, usbReady;
 const bridge=await startDeviceServer({backend,bot:matches[0],host:config.host,port:config.port,key:Buffer.from(config.key,'hex'),sessionFactory:()=>{
-  session=new NativeBotSession({backend,bot:matches[0]});available=false;
+  session=new NativeBotSession({backend,bot:matches[0],locale:bridgeLocale({...process.env,GROK_LANGUAGE:'zh'})});available=false;
   session.on('taskChannel',event=>{available=event.available;});session.on('taskReturn',()=>{returned++;});
   session.on('transcript',event=>{if(event.role==='assistant' && /5535|五千五百三十五|五五三五/.test(event.text)) spoken=true;});
   session.on('audio',pcm=>{audioBytes+=pcm.length;});session.on('closed',event=>{saved=event.saved;});

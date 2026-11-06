@@ -7,15 +7,17 @@ import { startControlServer } from './control.mjs';
 import { startDeviceServer } from './device-server.mjs';
 import { deviceConfig,pairingConfig } from './device-config.mjs';
 import { startDiscovery } from './discovery.mjs';
-import { DEFAULT_BOT } from './locale.mjs';
+import { DEFAULT_BOT, localeEnv } from './locale.mjs';
 
 const args = process.argv.slice(2);
 function option(name) { const index = args.indexOf(name); return index < 0 ? undefined : args[index + 1]; }
 const mode = args[0] && !args[0].startsWith('-') ? args[0] : 'serve';
 if (args.includes('--help') || args.includes('-h')) {
-  console.log('npm start -- serve [--bot "Grok Orb"] [--port 8788] [--input DEVICE_ID] [--output DEVICE_ID]\nCommands: doctor, bots, serve, device\nEnvironment: GROK_BOT_NAME (default Grok Orb), GROK_LANGUAGE=es|en|zh (default es), GROK_TIMEZONE=<IANA zone> (default Europe/Madrid)\nMac microphone and native Grok Bot voice; no transcripts or credentials are logged.');
+  console.log('npm start -- serve [--bot "Grok Orb"] [--language es|en|zh] [--time-zone Europe/Madrid] [--port 8788] [--input DEVICE_ID] [--output DEVICE_ID]\nCommands: doctor, bots, serve, device\nEnvironment: GROK_BOT_NAME (default Grok Orb), GROK_LANGUAGE=es|en|zh (default es), GROK_TIMEZONE=<IANA zone> (default Europe/Madrid)\nMac microphone and native Grok Bot voice; no transcripts or credentials are logged.');
 } else {
   try {
+    const locale = localeEnv(args, process.env);
+    for (const key of ['GROK_LANGUAGE', 'GROK_TIMEZONE']) if (locale[key] !== undefined) process.env[key] = locale[key];
     if (mode === 'doctor') {
       buildAudio();
       const devices = JSON.parse(execFileSync('.build/mac-audio', ['--devices'], { cwd: projectRoot, encoding: 'utf8' }));

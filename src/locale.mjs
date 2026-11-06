@@ -16,6 +16,17 @@ export function validTimeZone(timeZone) {
   catch { return false; }
 }
 
+// --language y --time-zone ganan a GROK_LANGUAGE y GROK_TIMEZONE. Devuelve el entorno
+// resultante ya validado, para que cli.mjs lo aplique antes de crear nada.
+export function localeEnv(args = [], env = process.env) {
+  const option = name => { const index = args.indexOf(name); return index < 0 ? undefined : args[index + 1]; };
+  const next = { ...env };
+  if (option('--language') !== undefined) next.GROK_LANGUAGE = option('--language');
+  if (option('--time-zone') !== undefined) next.GROK_TIMEZONE = option('--time-zone');
+  bridgeLocale(next);
+  return next;
+}
+
 export function bridgeLocale(env = process.env) {
   const language = env.GROK_LANGUAGE ?? DEFAULT_LANGUAGE, timeZone = env.GROK_TIMEZONE ?? DEFAULT_TIMEZONE;
   if (!Object.hasOwn(LANGUAGES, language)) throw Object.assign(new Error('Unsupported GROK_LANGUAGE'), { code: 'LANGUAGE_UNSUPPORTED' });
