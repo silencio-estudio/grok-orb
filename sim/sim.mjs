@@ -3,6 +3,7 @@
 //   node sim/sim.mjs --shots D  capturas PNG de cada estado en D, sin ventana
 //   node sim/sim.mjs --selftest prueba de teclas y estados, sin ventana
 //   node sim/sim.mjs --build    solo compilar
+//   --theme pixel               tema de 8 bits (CONFIG_PET_THEME_PIXEL); por defecto, el suave
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -15,6 +16,9 @@ const sim = join(root, 'sim'), build = join(root, '.build/sim'), lvgl = join(bui
 const LVGL_TAG = 'v9.5.0', LVGL_COMMIT = '85aa60d18b3d5e5588d7b247abf90198f07c8a63';
 const firmware = join(root, 'firmware/pet/components');
 const args = process.argv.slice(2);
+const themeArg = args.indexOf('--theme') >= 0 ? args[args.indexOf('--theme') + 1] : 'smooth';
+if (!['smooth', 'pixel'].includes(themeArg)) { console.error('Simulador: --theme smooth|pixel'); process.exit(1); }
+const pixel = themeArg === 'pixel';
 
 function run(command, list, options = {}) { return (execFileSync(command, list, { encoding: 'utf8', ...options }) ?? '').trim(); }
 function fail(message) { console.error(`Simulador: ${message}`); process.exit(1); }
@@ -41,14 +45,19 @@ mkdirSync(objects, { recursive: true });
 
 const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
   entry.isDirectory() ? walk(join(dir, entry.name)) : entry.name.endsWith('.c') ? [join(dir, entry.name)] : []);
-const ours = [join(sim, 'sim_main.c'), join(firmware, 'pet_ui/pet_ui.c'), join(firmware, 'pet_core/pet_core.c'),
+const ours = [join(sim, 'sim_main.c'), join(firmware, 'pet_ui/pet_ui.c'), join(firmware, 'pet_ui/pet_motion.c'),
+  join(firmware, 'pet_core/pet_core.c'),
   // Sin sdkconfig, pet_strings.h elige español: como en la placa, sin la fuente CJK.
-  join(firmware, 'pet_ui/fonts/pet_font_latin_16.c')];
+  ...(pixel ? ['pet_ui/fonts/pet_font_pixel_16.c', 'pet_ui/fonts/pet_font_title_16.c'] : ['pet_ui/fonts/pet_font_latin_16.c']).map(name => join(firmware, name))];
+// LVGL se compila una vez; lo nuestro, una vez por tema.
+const themeFlags = pixel ? ['-DCONFIG_PET_THEME_PIXEL=1'] : [];
+const themeObjects = join(objects, `theme-${themeArg}`);
+mkdirSync(themeObjects, { recursive: true });
 const newestHeader = Math.max(...[join(sim, 'fakes'), join(firmware, 'pet_ui'), join(firmware, 'pet_core')]
   .flatMap(dir => readdirSync(dir, { recursive: true }).filter(name => name.endsWith('.h')).map(name => statSync(join(dir, name)).mtimeMs)));
 const sources = [...walk(join(lvgl, 'src')), ...ours];
 
-const objectFor = source => join(objects, relative(root, source).replaceAll('/', '__').replace(/\.c$/, '.o'));
+const objectFor = source => join(ours.includes(source) ? themeObjects : objects, relative(root, source).replaceAll('/', '__').replace(/\.c$/, '.o'));
 const stale = sources.filter(source => {
   const object = objectFor(source);
   if (!existsSync(object)) return true;
@@ -62,7 +71,7 @@ async function compile(list) {
     while (next < list.length) {
       const source = list[next++];
       await new Promise((resolve, reject) => {
-        const child = spawn('cc', [...flags, '-c', source, '-o', objectFor(source)], { stdio: ['ignore', 'inherit', 'inherit'] });
+        const child = spawn('cc', [...flags, ...(ours.includes(source) ? themeFlags : []), '-c', source, '-o', objectFor(source)], { stdio: ['ignore', 'inherit', 'inherit'] });
         child.on('exit', code => code === 0 ? resolve() : reject(new Error(relative(root, source))));
       });
       if (++done % 50 === 0 || done === list.length) process.stdout.write(`\rCompilando ${done}/${list.length}`);
@@ -73,8 +82,8 @@ async function compile(list) {
 }
 try { await compile(stale); } catch (error) { fail(`no compila ${error.message}`); }
 
-const binary = join(build, 'grok-orb-sim');
-const linkStamp = join(objects, '.link');
+const binary = join(build, pixel ? 'grok-orb-sim-pixel' : 'grok-orb-sim');
+const linkStamp = join(themeObjects, '.link');
 if (stale.length || !existsSync(binary) || !existsSync(linkStamp) || readFileSync(linkStamp, 'utf8').trim() !== binary) {
   run('cc', ['-o', binary, ...sources.map(objectFor), ...sdlConfig.libs, '-lz', '-lm'], { stdio: 'inherit' });
   writeFileSync(linkStamp, binary);

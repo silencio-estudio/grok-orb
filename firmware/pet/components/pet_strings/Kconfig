@@ -13,10 +13,26 @@ menu "Grok pet interface"
             bool "Chinese (adds the CJK font)"
     endchoice
 
+    choice PET_THEME
+        prompt "Theme"
+        default PET_THEME_SMOOTH
+        help
+            Smooth: the round pink orb with anti-aliased Montserrat text.
+            8-bit: a 16-colour PICO-8-style palette, pixel text (Press Start 2P
+            titles, Unifont body), square widgets and a dithered orb drawn in
+            8 px blocks at 8 frames/s. Both use the same spring-based motion.
+
+        config PET_THEME_SMOOTH
+            bool "Smooth"
+        config PET_THEME_PIXEL
+            bool "8-bit"
+    endchoice
+
     config PET_DISPLAY_NAME
         string "Name shown on screen"
         default "Grok Orb"
         help
-            Name of the orb for on-screen use. Not shown at the moment:
-            the top of Settings only shows the battery level, when there is one.
+            The single title of Settings and of the connection page, followed
+            by the battery level on the same line when there is a battery.
+            The main orb screen does not show it.
 endmenu

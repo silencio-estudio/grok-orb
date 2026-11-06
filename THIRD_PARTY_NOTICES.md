@@ -17,9 +17,13 @@ Retained files include the board support headers and LCD-band implementation in 
 
 `firmware/pet/components/pet_ui/fonts/pet_font_latin_16.c` is an LVGL C conversion (lv_font_conv 1.5.3, 16 px, 4 bpp) of the Latin-1 supplement and a few punctuation glyphs of Montserrat Medium, the same family as LVGL's built-in Montserrat. Copyright 2011 The Montserrat Project Authors (<https://github.com/JulietaUla/Montserrat>). Source TTF: LVGL v9.5.0 `scripts/built_in_font/Montserrat-Medium.ttf`, SHA-256 `421f26b23e2be6b98373d32acd3cb2897b154d4bf0a77d26534ce476e4cbed53`. Distributed under **SIL Open Font License 1.1**, separately from the Apache-licensed application; license text in [Montserrat-OFL-1.1.txt](docs/third-party/Montserrat-OFL-1.1.txt).
 
+## Press Start 2P — OFL-1.1 (8-bit theme titles)
+
+`firmware/pet/components/pet_ui/fonts/pet_font_title_16.c` is an LVGL C conversion of a subset of Press Start 2P (google/fonts `ofl/pressstart2p` at dbd72d6ef9ebea750d33c02c7189633e972d6a40). Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name "Press Start 2P". As a subset it is a Modified Version and is named `pet_font_title_16`. Distributed under **SIL Open Font License 1.1**: [PressStart2P-OFL-1.1.txt](docs/third-party/PressStart2P-OFL-1.1.txt).
+
 ## GNU Unifont 16.0.04 — OFL-1.1 for the distributed font
 
-`firmware/pet/components/pet_ui/fonts/muse_font_cjk_16.c` is an LVGL C conversion of an unaltered subset of GNU Unifont glyphs. Font copyright:
+`firmware/pet/components/pet_ui/fonts/muse_font_cjk_16.c` and `pet_font_pixel_16.c` (8-bit theme) are LVGL C conversions of unaltered subsets of GNU Unifont glyphs. Font copyright:
 
 Copyright © 1998-2025 Roman Czyborra, Paul Hardy, Qianqian Fang, Andrew Miller, Johnnie Weaver, David Corbett, Nils Moskopp, Rebecca Bettencourt, Ho-Seok Ee, et al.
 
