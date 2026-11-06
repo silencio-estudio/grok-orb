@@ -218,8 +218,8 @@ Hoy hay dos sitios fijados a Shanghái:
 
 Propuesta (recomendada): **el Mac calcula el desfase y el firmware solo lo aplica.**
 
-- El mensaje `clock` pasa a `{op:'clock', epochMs, utcOffsetMin}`. El puente calcula `utcOffsetMin` con `Intl` para la zona configurada en ese instante. Como se reenvía cada 30 s, el cambio de hora de marzo y octubre se aplica solo, en menos de 30 s.
-- `src/pet-protocol.mjs` valida `utcOffsetMin` como entero en [-720, 840]. El firmware lo acepta en ese rango; si falta, usa 0 (UTC) en lugar de +8. No hace falta guardar reglas de zona horaria en la placa.
+- El mensaje `clock` pasa a `{op:'clock', epochMs, offsetMin}`. El puente calcula `offsetMin` con `Intl` para la zona configurada en ese instante. Como se reenvía cada 30 s, el cambio de hora de marzo y octubre se aplica solo, en menos de 30 s.
+- `src/pet-protocol.mjs` valida `offsetMin` como entero en [-720, 840]. El firmware lo acepta en ese rango; si falta, usa 0 (UTC) en lugar de +8. No hace falta guardar reglas de zona horaria en la placa.
 - Tests: `tests/pet-protocol.test.mjs` y el harness C `tests/pet_link_harness.c` (lo compila `tests/pet-link.test.mjs` en el host), con casos a ambos lados del cambio de hora de Madrid (último domingo de marzo y de octubre).
 
 Alternativa: guardar en NVS una cadena POSIX (`CET-1CEST,M3.5.0,M10.5.0/3`) y usar `setenv("TZ")` + `localtime_r` en la placa. Así hay hora local sin Mac si además se usa el RTC, pero cada zona exige su cadena POSIX y cambiarla implica reconfigurar la placa. Tiene sentido solo cuando se añada el RTC (fase 8).
@@ -233,8 +233,8 @@ Cada fase es una PR pequeña contra `main`. Las fases 1 a 6 se comprueban **sin 
 | Fase | PR | Contenido | Cómo se comprueba |
 |---|---|---|---|
 | 0 | Este documento | Plan | `npm test` (79 pasan, 3 omitidos: son las comprobaciones de dependencias del target, que se saltan sin build); el build actual de 1.43C compila (app `0x22E8E0`, 44 % libre) |
-| 1 | Puente en español + zona horaria | §3.2 y la parte del puente de §3.3 (`utcOffsetMin`, cabecera, `spokenLanguage`, `language_hint`, textos de los paneles y de la CLI, bot «Grok Orb» por defecto). Las frases de las pruebas de aceptación (`live-acceptance.mjs`, `hardware-interrupt.mjs`, `*-task-acceptance.mjs`, `hardware_acceptance.py`) necesitan una voz de síntesis en español y se traducen al preparar la fase 7 | `npm test` con tests nuevos de configuración, zona y cambio de hora. Prueba manual de voz **solo en el Mac** (`npm start -- serve`) para confirmar que el servicio acepta `Spanish` |
-| 2 | Reloj del firmware | `pet_link.c` usa `utcOffsetMin`; se quita el `+8*3600` | `npm test` (harness C de `pet_link`); build 1.43C |
+| 1 | Puente en español + zona horaria | §3.2 y la parte del puente de §3.3 (`offsetMin`, cabecera, `spokenLanguage`, `language_hint`, textos de los paneles y de la CLI, bot «Grok Orb» por defecto). Las frases de las pruebas de aceptación (`live-acceptance.mjs`, `hardware-interrupt.mjs`, `*-task-acceptance.mjs`, `hardware_acceptance.py`) necesitan una voz de síntesis en español y se traducen al preparar la fase 7 | `npm test` con tests nuevos de configuración, zona y cambio de hora. Prueba manual de voz **solo en el Mac** (`npm start -- serve`) para confirmar que el servicio acepta `Spanish` |
+| 2 | Reloj del firmware | `pet_link.c` usa `offsetMin`; se quita el `+8*3600` | `npm test` (harness C de `pet_link`); build 1.43C |
 | 3 | Selección de placa | Kconfig de placa, `sdkconfig.defaults.<placa>`, particiones por placa, `build_pet.py --board`, nombre de placa en estado/BLE desde `pet_board()->name`. **Sin** código de la 1.75C todavía | Build 1.43C con el mismo `sdkconfig` efectivo que antes (comparar hash) y la misma app |
 | 4 | Placa 1.75C | `board_waveshare_s3_175c.c`, `axp2101.c` en modo lectura + raíl de los códecs, CST9217, tabla de 32 MB (§2.1), procedencia y licencias | Build `--board 175c` correcto, app ≤ `0x7E0000`; test de host que detecta GPIOs repetidos o fuera de rango en las placas; build 1.43C sin cambios |
 | 5 | Interfaz en español | Tabla de cadenas, Montserrat 16 con Latin-1, revisión de la maquetación | Build de las dos placas; test de host que comprueba que todos los caracteres de `pet_strings_es.c` están en la fuente y que ninguna cadena supera su ancho máximo |
@@ -343,7 +343,7 @@ Revisión de solo lectura de `claude/port-175c-es` en `4c321c7`. No se ha compil
 | Bot por defecto (D2) | «Grok Orb», `--bot` y `GROK_BOT_NAME` | `--bot` y `GROK_BOT_NAME`, pero por defecto sigue `小糖` | **Pendiente**: cambiar el valor por defecto |
 | Nombre en pantalla (D2) | `CONFIG_PET_DISPLAY_NAME`, «Grok Orb» por defecto | «Grok Orb» fijo en `pet_ui.c` | **Pendiente**: llevarlo a Kconfig |
 | Idioma de la interfaz (D3) | Kconfig `PET_LANG_ES`/`_ZH`, sin CJK en español | Español fijo; `muse_font_cjk_16.c` sigue compilándose siempre | **Pendiente** |
-| Hora (D4) | Desfase desde el Mac | `offsetMin` en `clock`; sin él, la placa usa +8 h | Cumple. Mismo diseño con otro nombre de campo (`offsetMin`) |
+| Hora (D4) | Desfase desde el Mac | `offsetMin` en `clock`; sin él, la placa usa +8 h | Cumple. El puente de la PR #4 manda ese mismo campo |
 | Tabla de particiones (§2.1, D6) | 32 MB, ranuras de ~8 MB, `coredump`, `storage`, `prod_data`/`prod_bak` | Cabecera de 16 MB, dos ranuras de 6 MB, resto sin tocar; **sin `prod_data`/`prod_bak`** | **Pendiente**: añadir `prod_data`/`prod_bak` (D6). Que la cabecera sea de 16 MB, para que también arranque en placas de 16 MB, es aceptable si Ángel lo da por bueno |
 | AXP2101 (D9) | Solo lectura, con o sin batería | Escribe ALDO1 a 3,3 V, lo enciende y activa el ADC de batería | **No cumple D9**. O se quita la escritura, o se confirma con el esquemático que ALDO1 es solo el micro y Ángel acepta la excepción |
 | Tabla de origen (D5) | No suponer ninguna; leerla de la copia | Compara los primeros 0x9000 bytes de la placa con la copia: no supone contenido, pero sí que el bootloader y la tabla de fábrica caben por debajo de 0x9000 | Cumple casi siempre. Revisar cuando exista la copia real |
@@ -353,5 +353,4 @@ Revisión de solo lectura de `claude/port-175c-es` en `4c321c7`. No se ha compil
 
 Siguiente fase propuesta, sin tocar la placa: una PR pequeña sobre la rama de la PR #1 (o tras fusionarla) con los cuatro pendientes de arriba: bot por defecto, `CONFIG_PET_DISPLAY_NAME`, `CONFIG_PET_LANG_*` sin CJK en español, y `prod_data`/`prod_bak`. El AXP2101 queda a la espera de la decisión sobre D9.
 
-El trabajo de la fase 1 de esta rama (`src/locale.mjs` con `--language` y `--time-zone`, y los tests de cambio de hora) se ha guardado en la rama local `claude/plan-port-1-75c-fase1-local`, sin subir, por si sirve de referencia.
-
+La fase 1 (puente del Mac en español, «Grok Orb» por defecto, `--language` y `--time-zone`, y tests de cambio de hora) está en su propia PR, la #4 (`claude/bridge-es-madrid`). Usa `offsetMin`, el mismo campo que lee el firmware de la PR #1, y no sustituye a la PR #1, que además lleva el firmware.
