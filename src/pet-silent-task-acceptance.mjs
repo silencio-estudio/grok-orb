@@ -4,7 +4,8 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {loadAuth} from './auth.mjs';
 import {Backend} from './backend.mjs';
 import {NativeBotSession} from './native-bot.mjs';
-import { DEFAULT_BOT } from './locale.mjs';
+import { DEFAULT_BOT, bridgeLocale } from './locale.mjs';
+// Frases de prueba aún en chino: la voz se fija a zh hasta traducirlas (fase 7 de docs/PORT-1.75C.md).
 
 const historyOnly=process.argv.includes('--history-only');
 const report={passed:false,status:'running',phase:'login',playback:'disabled',deviceSpeakerVerified:false,eventTransport:historyOnly?'blocked-in-test':'normal',taskSubmissions:0};
@@ -22,7 +23,7 @@ try{
   if(historyOnly)backend.openEvents=async()=>{throw new Error('TEST_EVENT_STREAM_UNAVAILABLE');};
   const matches=(await backend.listBots()).filter(bot=>bot.name===(process.env.GROK_BOT_NAME??DEFAULT_BOT));
   if(matches.length!==1)throw new Error('BOT_NOT_UNIQUE');
-  session=new NativeBotSession({backend,bot:matches[0]});
+  session=new NativeBotSession({backend,bot:matches[0],locale:bridgeLocale({...process.env,GROK_LANGUAGE:'zh'})});
   session.on('taskChannel',event=>{available=event.available;});
   session.on('taskReturn',()=>{returned++;});
   session.on('transcript',event=>{if(event.role==='assistant'&&/5535|五千五百三十五|五五三五/.test(event.text))result=true;});
