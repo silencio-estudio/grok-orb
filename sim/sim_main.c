@@ -28,7 +28,7 @@ static uint64_t virtual_ms=1000;
 static scene_t scene;
 static pet_state_t model;
 static pet_ui_view_t view;
-static bool network_connected,mac_connected,demo_turn,boot_held;
+static bool network_connected,mac_connected,demo_turn,boot_key;
 static uint64_t speak_started;
 static lv_obj_t *dim;
 
@@ -79,7 +79,7 @@ static void link_state(pet_connection_t state,uint64_t at){
 static void speak(uint64_t at){post(PET_EV_BUFFERED,at,0);post(PET_EV_PLAYING,at,500);speak_started=at;snprintf(view.caption,sizeof(view.caption),"%s",reply);}
 
 static void apply_scene(scene_t next){
-    scene=next;demo_turn=false;boot_held=false;
+    scene=next;demo_turn=false;
     uint64_t now=now_ms(),start=now>4000?now-4000:0;
     pet_init(&model,start);
     post(PET_EV_USB,start,1);   /* La 1.75C de Ángel va por USB (decisión D9). */
@@ -90,7 +90,7 @@ static void apply_scene(scene_t next){
     if(next==S_CONNECTING)link_state(PET_CONN_CONNECTING,start);
     else if(next==S_OFFLINE)link_state(PET_CONN_OFFLINE,start);
     else link_state(PET_CONN_READY,start);
-    if(next==S_LISTEN){post(PET_EV_PRESS,now-600,0);boot_held=true;}
+    if(next==S_LISTEN)post(PET_EV_PRESS,now-600,0);
     if(next==S_THINK||next==S_SPEAK){post(PET_EV_PRESS,now-2500,0);post(PET_EV_RELEASE,now-1000,0);}
     if(next==S_SPEAK)speak(now);
     if(next==S_SETTINGS)pet_ui_bench_page(1);else if(next==S_NETWORK)pet_ui_bench_page(2);else pet_ui_home();
@@ -185,33 +185,71 @@ static int shots(const char *dir){
     return 0;
 }
 
-static void keys(void){
-    static Uint8 before[SDL_NUM_SCANCODES];int count;const Uint8 *state=SDL_GetKeyboardState(&count);
-    #define DOWN(k) (state[k]&&!before[k])
-    for(int i=0;i<S_COUNT;i++)if(DOWN(SDL_SCANCODE_1+i))apply_scene((scene_t)i);
-    if(DOWN(SDL_SCANCODE_RIGHT)||DOWN(SDL_SCANCODE_SPACE))apply_scene((scene_t)((scene+1)%S_COUNT));
-    if(DOWN(SDL_SCANCODE_LEFT))apply_scene((scene_t)((scene+S_COUNT-1)%S_COUNT));
-    /* B hace de botón BOOT: mantener para hablar, soltar para enviar. El bot simulado responde. */
-    if(state[SDL_SCANCODE_B]!=boot_held){
-        boot_held=state[SDL_SCANCODE_B];
-        if(boot_held){if(model.dialogue!=PET_DIALOGUE_IDLE){post(PET_EV_CANCEL,now_ms(),0);}view.caption[0]=0;post(PET_EV_PRESS,now_ms(),0);}
+/* Una tecla que cambia de estado. La ventana y --selftest pasan por aquí. */
+static void key(SDL_Scancode code,bool down){
+    if(code==SDL_SCANCODE_B){
+        /* B hace de botón BOOT: mantener para hablar, soltar para enviar. El bot simulado responde. */
+        if(down==boot_key)return;
+        boot_key=down;
+        if(down){if(model.dialogue!=PET_DIALOGUE_IDLE&&model.dialogue!=PET_DIALOGUE_LISTEN)post(PET_EV_CANCEL,now_ms(),0);view.caption[0]=0;post(PET_EV_PRESS,now_ms(),0);}
         else {post(PET_EV_RELEASE,now_ms(),0);demo_turn=model.dialogue==PET_DIALOGUE_WAIT;}
+        return;
     }
-    if(DOWN(SDL_SCANCODE_S)){
+    if(!down)return;
+    if(code>=SDL_SCANCODE_1&&code<SDL_SCANCODE_1+S_COUNT)apply_scene((scene_t)(code-SDL_SCANCODE_1));
+    else if(code==SDL_SCANCODE_RIGHT||code==SDL_SCANCODE_SPACE)apply_scene((scene_t)((scene+1)%S_COUNT));
+    else if(code==SDL_SCANCODE_LEFT)apply_scene((scene_t)((scene+S_COUNT-1)%S_COUNT));
+    else if(code==SDL_SCANCODE_S){
         mkdir(".build",0755);mkdir(".build/sim",0755);mkdir(".build/sim/shots",0755);
         char path[256];snprintf(path,sizeof(path),".build/sim/shots/%s.png",scenes[scene].id);capture(path);
     }
-    if(DOWN(SDL_SCANCODE_Q)||DOWN(SDL_SCANCODE_ESCAPE))exit(0);
-    memcpy(before,state,count<SDL_NUM_SCANCODES?count:SDL_NUM_SCANCODES);
+    else if(code==SDL_SCANCODE_Q||code==SDL_SCANCODE_ESCAPE)exit(0);
+}
+static void keys(void){
+    static Uint8 before[SDL_NUM_SCANCODES];int count;const Uint8 *state=SDL_GetKeyboardState(&count);
+    if(count>SDL_NUM_SCANCODES)count=SDL_NUM_SCANCODES;
+    for(int code=0;code<count;code++)if(state[code]!=before[code])key((SDL_Scancode)code,state[code]);
+    memcpy(before,state,count);
+}
+
+/* Recorre los controles con tiempo virtual y comprueba lo que hace pet_core. */
+static int failures;
+static void check(bool ok,const char *what){printf("%s %s\n",ok?"ok   ":"FALLO",what);if(!ok)failures++;}
+static void tap(SDL_Scancode code){key(code,true);key(code,false);advance(300);}
+static int selftest(void){
+    apply_scene(S_READY);advance(500);
+    check(model.connection==PET_CONN_READY&&model.dialogue==PET_DIALOGUE_IDLE,"2 lista: conectada y en reposo");
+    key(SDL_SCANCODE_B,true);advance(800);check(model.dialogue==PET_DIALOGUE_LISTEN,"B mantenida: escuchando");
+    key(SDL_SCANCODE_B,false);advance(100);check(model.dialogue==PET_DIALOGUE_WAIT,"B soltada: pensando");
+    advance(1300);check(model.dialogue==PET_DIALOGUE_SPEAK&&view.caption[0],"el bot simulado responde con subtítulo");
+    advance(5200);check(model.dialogue==PET_DIALOGUE_IDLE,"la respuesta termina y vuelve al reposo");
+    key(SDL_SCANCODE_B,true);advance(300);key(SDL_SCANCODE_B,false);advance(1500);
+    key(SDL_SCANCODE_B,true);advance(300);check(model.dialogue==PET_DIALOGUE_LISTEN&&!view.caption[0],"B durante la respuesta interrumpe y vuelve a escuchar");
+    key(SDL_SCANCODE_B,false);advance(7000);
+    static const struct {pet_connection_t connection;pet_dialogue_t dialogue;} expected[S_COUNT]={
+        {PET_CONN_CONNECTING,PET_DIALOGUE_IDLE},{PET_CONN_READY,PET_DIALOGUE_IDLE},{PET_CONN_READY,PET_DIALOGUE_LISTEN},
+        {PET_CONN_READY,PET_DIALOGUE_WAIT},{PET_CONN_READY,PET_DIALOGUE_SPEAK},{PET_CONN_OFFLINE,PET_DIALOGUE_IDLE},
+        {PET_CONN_READY,PET_DIALOGUE_IDLE},{PET_CONN_READY,PET_DIALOGUE_IDLE}};
+    for(int i=0;i<S_COUNT;i++){
+        tap((SDL_Scancode)(SDL_SCANCODE_1+i));char what[96];snprintf(what,sizeof(what),"tecla %d: %s",i+1,scenes[i].title);
+        check(scene==i&&model.connection==expected[i].connection&&model.dialogue==expected[i].dialogue,what);
+    }
+    tap(SDL_SCANCODE_RIGHT);check(scene==S_CONNECTING,"→ desde el último estado vuelve al primero");
+    tap(SDL_SCANCODE_LEFT);check(scene==S_NETWORK,"← desde el primero va al último");
+    tap(SDL_SCANCODE_SPACE);check(scene==S_CONNECTING,"Espacio avanza");
+    tap(SDL_SCANCODE_3);advance(3000);check(model.dialogue==PET_DIALOGUE_LISTEN,"3 escuchando se mantiene sin tocar B");
+    printf(failures?"%d comprobaciones fallidas\n":"Todo bien\n",failures);
+    return failures?1:0;
 }
 
 int main(int argc,char **argv){
-    const char *shot_dir=NULL;
-    for(int i=1;i<argc;i++)if(!strcmp(argv[i],"--shots")&&i+1<argc)shot_dir=argv[++i];
-    headless=shot_dir!=NULL;
+    const char *shot_dir=NULL;bool test=false;
+    for(int i=1;i<argc;i++){if(!strcmp(argv[i],"--shots")&&i+1<argc)shot_dir=argv[++i];else if(!strcmp(argv[i],"--selftest"))test=true;}
+    headless=shot_dir!=NULL||test;
     lv_init();lv_tick_set_cb(tick);
     view.volume=60;view.brightness=80;view.battery=-1;view.quiet=true;view.captions=true;view.speaker=true;
     if(pet_ui_start(on_action,NULL)!=ESP_OK){fprintf(stderr,"No se pudo arrancar la interfaz\n");return 1;}
+    if(test)return selftest();
     if(headless)return shots(shot_dir);
     apply_scene(S_READY);
     printf("Grok Orb 1.75C\n  1-8  estados (conectando, lista, escuchando, pensando, hablando, sin conexión, ajustes, red)\n"

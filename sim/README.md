@@ -19,6 +19,7 @@ La primera vez descarga LVGL `v9.5.0` en `.build/sim/lvgl` (fijado al commit `85
 |---|---|
 | `npm run sim` | Abre la ventana |
 | `npm run sim:shots` | Regenera las capturas de `docs/sim/` sin abrir ventana |
+| `npm run sim:test` | Prueba sin ventana: pasa por el mismo código que las teclas (`B`, `1`–`8`, `←`/`→`, `Espacio`) y comprueba cada estado de `pet_core` |
 | `node sim/sim.mjs --shots <carpeta>` | Capturas en otra carpeta |
 | `node sim/sim.mjs --build` | Solo compila (`.build/sim/grok-orb-sim`) |
 

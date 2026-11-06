@@ -11,7 +11,8 @@
     "doctor": "node src/cli.mjs doctor",
     "build:audio": "node --input-type=module -e \"import {buildAudio} from './src/mac-audio.mjs';buildAudio();console.log('Mac audio helper built');\"",
     "sim": "node sim/sim.mjs",
-    "sim:shots": "node sim/sim.mjs --shots docs/sim"
+    "sim:shots": "node sim/sim.mjs --shots docs/sim",
+    "sim:test": "node sim/sim.mjs --selftest"
   },
   "description": "Standalone ESP32-S3 companion pet firmware with a native Grok Bot macOS voice bridge",
   "license": "Apache-2.0",

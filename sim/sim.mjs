@@ -1,6 +1,7 @@
 // Compila y lanza el simulador de escritorio del orb (macOS + SDL2).
 //   node sim/sim.mjs            ventana interactiva
 //   node sim/sim.mjs --shots D  capturas PNG de cada estado en D, sin ventana
+//   node sim/sim.mjs --selftest prueba de teclas y estados, sin ventana
 //   node sim/sim.mjs --build    solo compilar
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -81,5 +82,6 @@ if (stale.length || !existsSync(binary) || !existsSync(linkStamp) || readFileSyn
 if (args.includes('--build')) { console.log(relative(root, binary)); process.exit(0); }
 
 const shots = args.indexOf('--shots');
-const child = spawn(binary, shots >= 0 ? ['--shots', args[shots + 1] ?? join(build, 'shots')] : [], { cwd: root, stdio: 'inherit' });
+const mode = args.includes('--selftest') ? ['--selftest'] : shots >= 0 ? ['--shots', args[shots + 1] ?? join(build, 'shots')] : [];
+const child = spawn(binary, mode, { cwd: root, stdio: 'inherit' });
 child.on('exit', code => process.exit(code ?? 1));
