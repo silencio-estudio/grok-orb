@@ -21,6 +21,8 @@ La primera vez descarga LVGL `v9.5.0` en `.build/sim/lvgl` (fijado al commit `85
 | `npm run sim:shots` | Regenera las capturas de `docs/sim/` sin abrir ventana |
 | `npm run sim:test` | Prueba sin ventana: pasa por el mismo código que las teclas (`B`, `1`–`8`, `←`/`→`, `Espacio`) y comprueba cada estado de `pet_core` |
 | `node sim/sim.mjs --shots <carpeta>` | Capturas en otra carpeta |
+| `node sim/sim.mjs --fps 5` | Abre la ventana y mide 5 s por estado (Lista, Pensando, Hablando): fotogramas pintados por segundo e intervalos entre ellos |
+| `node sim/sim.mjs --bench` | Sin ventana, con bandas de 118 líneas y el periodo de la placa (33 ms): píxeles que se repintan por fotograma, tiempo estimado de QSPI en el S3 y CPU de LVGL en el Mac |
 | `node sim/sim.mjs --build` | Solo compila (`.build/sim/grok-orb-sim`) |
 
 ## Controles
@@ -67,3 +69,10 @@ Diferencias con la placa:
 - **Tiempo:** en las capturas es virtual (1,4 s tras entrar en cada estado), así que salen idénticas en cada ejecución. En la ventana es tiempo real.
 - **No se simulan** el audio, la red, el Bluetooth ni la NVS. Los textos de estado de red son los mismos que escribe `pet_app.c`.
 - El volcado por USB de `pet.snapshot` se descarta; para capturas usa `S` o `--shots`.
+
+## Fluidez y coste en la placa
+
+La ventana refresca a 60 Hz con vsync (`LV_DEF_REFR_PERIOD 16` en `lv_conf.h`); la placa sigue a 33 ms. LVGL solo pinta cuando algo cambia, así que `--fps` cuenta fotogramas con cambios: en reposo la respiración mueve el orb a saltos de 1 px unas pocas veces por segundo, y eso es lo que se ve también en la placa.
+
+`--bench` da el coste por fotograma con el periodo de la placa. El tiempo de QSPI sale de los píxeles a 2 bytes y 20 MB/s (40 MHz, 4 líneas). La CPU es la del Mac: sirve para comparar, no es la del S3.
+

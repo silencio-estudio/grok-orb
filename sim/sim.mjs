@@ -82,6 +82,8 @@ if (stale.length || !existsSync(binary) || !existsSync(linkStamp) || readFileSyn
 if (args.includes('--build')) { console.log(relative(root, binary)); process.exit(0); }
 
 const shots = args.indexOf('--shots');
-const mode = args.includes('--selftest') ? ['--selftest'] : shots >= 0 ? ['--shots', args[shots + 1] ?? join(build, 'shots')] : [];
+const fps = args.indexOf('--fps');
+const mode = args.includes('--selftest') ? ['--selftest'] : args.includes('--bench') ? ['--bench']
+  : fps >= 0 ? ['--fps', args[fps + 1] ?? '5'] : shots >= 0 ? ['--shots', args[shots + 1] ?? join(build, 'shots')] : [];
 const child = spawn(binary, mode, { cwd: root, stdio: 'inherit' });
 child.on('exit', code => process.exit(code ?? 1));

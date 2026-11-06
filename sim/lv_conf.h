@@ -9,7 +9,8 @@
 #define LV_USE_STDLIB_STRING LV_STDLIB_CLIB
 #define LV_USE_STDLIB_SPRINTF LV_STDLIB_CLIB
 #define LV_USE_OS LV_OS_NONE
-#define LV_DEF_REFR_PERIOD 33
+/* 60 fps en el Mac; la placa sigue con 33 ms (CONFIG_LV_DEF_REFR_PERIOD por defecto). */
+#define LV_DEF_REFR_PERIOD 16
 #define LV_DPI_DEF 130
 
 #define LV_FONT_MONTSERRAT_14 1

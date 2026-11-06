@@ -39,23 +39,39 @@ int64_t esp_timer_get_time(void){return (int64_t)now_ms()*1000;}
 /* Placa: el brillo y el apagado del AMOLED se imitan con una capa negra. */
 static bool lock(int timeout_ms){(void)timeout_ms;return true;}
 static void unlock(void){}
-static void set_brightness(int pct){if(dim)lv_obj_set_style_bg_opa(dim,(lv_opa_t)(255-pct*255/100),0);}
-static void panel_sleep(bool sleep){if(dim)lv_obj_set_style_bg_opa(dim,sleep?LV_OPA_COVER:LV_OPA_TRANSP,0);}
+/* Solo se toca la capa si cambia: cada cambio repinta la pantalla entera, cosa que el
+ * brillo real del AMOLED (un comando 0x51) no hace. */
+static void dim_to(lv_opa_t opa){if(dim&&lv_obj_get_style_bg_opa(dim,0)!=opa)lv_obj_set_style_bg_opa(dim,opa,0);}
+static void set_brightness(int pct){dim_to((lv_opa_t)(255-pct*255/100));}
+static void panel_sleep(bool sleep){dim_to(sleep?LV_OPA_COVER:LV_OPA_TRANSP);}
 static const sim_board_t board={lock,unlock,set_brightness,panel_sleep};
 const sim_board_t *pet_board(void){return &board;}
 
-static void flush_noop(lv_display_t *display,const lv_area_t *area,uint8_t *pixels){(void)area;(void)pixels;lv_display_flush_ready(display);}
+/* Medidas: píxeles enviados al panel (sin ventana) e instantes de cada fotograma pintado (con ventana). */
+static uint64_t flushed_px;
+static void flush_count(lv_display_t *display,const lv_area_t *area,uint8_t *pixels){
+    (void)pixels;flushed_px+=(uint64_t)lv_area_get_width(area)*lv_area_get_height(area);lv_display_flush_ready(display);
+}
+#define MAX_FRAMES 4096
+static double frame_at[MAX_FRAMES];
+static int frames;
+static double seconds(void){return (double)SDL_GetPerformanceCounter()/(double)SDL_GetPerformanceFrequency();}
+static void rendered(lv_event_t *event){(void)event;if(frames<MAX_FRAMES)frame_at[frames++]=seconds();}
 lv_display_t *pet_board_display_start(lv_indev_t **touch){
     lv_display_t *display;*touch=NULL;
     if(headless){
-        static uint8_t buffer[RES*RES*2] __attribute__((aligned(64)));
+        /* Como la placa: render parcial en bandas de 118 líneas (DRAW_BUF_LINES del board port). */
+        static uint8_t buffer[RES*118*2] __attribute__((aligned(64)));
         display=lv_display_create(RES,RES);
-        lv_display_set_buffers(display,buffer,NULL,sizeof(buffer),LV_DISPLAY_RENDER_MODE_FULL);
-        lv_display_set_flush_cb(display,flush_noop);
+        lv_display_set_buffers(display,buffer,NULL,sizeof(buffer),LV_DISPLAY_RENDER_MODE_PARTIAL);
+        lv_display_set_flush_cb(display,flush_count);
     }else{
+        /* vsync: cada fotograma se presenta en un refresco del monitor, sin tirones. */
+        SDL_SetHint(SDL_HINT_RENDER_VSYNC,"1");
         display=lv_sdl_window_create(RES,RES);
         if(!display)return NULL;
         *touch=lv_sdl_mouse_create();
+        lv_display_add_event_cb(display,rendered,LV_EVENT_RENDER_READY,NULL);
     }
     lv_obj_t *top=lv_display_get_layer_top(display);
     dim=lv_obj_create(top);lv_obj_remove_style_all(dim);lv_obj_set_size(dim,RES,RES);
@@ -242,21 +258,63 @@ static int selftest(void){
     return failures?1:0;
 }
 
+/* Coste por fotograma con el periodo de la placa: píxeles que irían por QSPI y CPU de LVGL. */
+static int bench(void){
+    static const scene_t list[]={S_READY,S_LISTEN,S_THINK,S_SPEAK,S_OFFLINE};
+    const double qspi_bytes_per_s=40e6*4/8;   /* QSPI a 40 MHz, 4 líneas (board port 1.75C) */
+    printf("estado          px/fotograma  QSPI ms (S3)  CPU us (Mac)\n");
+    for(unsigned i=0;i<sizeof(list)/sizeof(list[0]);i++){
+        virtual_ms+=60000;apply_scene(list[i]);advance(list[i]==S_OFFLINE?10600:1500);
+        uint64_t px=0;double cpu=0;const int n=150;
+        for(int k=0;k<n;k++){
+            virtual_ms+=33;flushed_px=0;double t0=seconds();refresh();lv_timer_handler();cpu+=seconds()-t0;px+=flushed_px;
+        }
+        printf("%-15s %12llu %13.1f %13.0f\n",scenes[list[i]].title,(unsigned long long)(px/n),px/(double)n*2/qspi_bytes_per_s*1000,cpu/n*1e6);
+    }
+    return 0;
+}
+/* Fotogramas por segundo de la ventana y regularidad entre fotogramas (los tirones). */
+static int cmp(const void *a,const void *b){double x=*(const double *)a,y=*(const double *)b;return x<y?-1:x>y;}
+static void fps_report(const char *name){
+    if(frames<3){printf("%-10s sin fotogramas\n",name);return;}
+    static double gaps[MAX_FRAMES];int n=frames-1;
+    for(int i=0;i<n;i++)gaps[i]=(frame_at[i+1]-frame_at[i])*1000;
+    double total=frame_at[frames-1]-frame_at[0];qsort(gaps,n,sizeof(double),cmp);
+    printf("%-10s %5.1f fps  intervalo mediano %5.1f ms  p95 %5.1f ms  máx %5.1f ms\n",name,n/total,gaps[n/2],gaps[n*95/100],gaps[n-1]);
+}
+static void run_window(double until){
+    while(seconds()<until){refresh();uint32_t idle=lv_timer_handler();keys();SDL_Delay(idle<1?1:idle>4?4:idle);}
+}
+static int measure(double each){
+    static const scene_t list[]={S_READY,S_THINK,S_SPEAK};
+    for(unsigned i=0;i<sizeof(list)/sizeof(list[0]);i++){
+        apply_scene(list[i]);run_window(seconds()+0.5);frames=0;run_window(seconds()+each);fps_report(scenes[list[i]].title);
+    }
+    return 0;
+}
+
 int main(int argc,char **argv){
-    const char *shot_dir=NULL;bool test=false;
-    for(int i=1;i<argc;i++){if(!strcmp(argv[i],"--shots")&&i+1<argc)shot_dir=argv[++i];else if(!strcmp(argv[i],"--selftest"))test=true;}
-    headless=shot_dir!=NULL||test;
+    const char *shot_dir=NULL;bool test=false,bench_mode=false;double fps_seconds=0;
+    for(int i=1;i<argc;i++){
+        if(!strcmp(argv[i],"--shots")&&i+1<argc)shot_dir=argv[++i];
+        else if(!strcmp(argv[i],"--selftest"))test=true;
+        else if(!strcmp(argv[i],"--bench"))bench_mode=true;
+        else if(!strcmp(argv[i],"--fps")&&i+1<argc)fps_seconds=atof(argv[++i]);
+    }
+    headless=shot_dir!=NULL||test||bench_mode;
     lv_init();lv_tick_set_cb(tick);
     view.volume=60;view.brightness=80;view.battery=-1;view.quiet=true;view.captions=true;view.speaker=true;
     if(pet_ui_start(on_action,NULL)!=ESP_OK){fprintf(stderr,"No se pudo arrancar la interfaz\n");return 1;}
     if(test)return selftest();
+    if(bench_mode)return bench();
     if(headless)return shots(shot_dir);
+    if(fps_seconds>0)return measure(fps_seconds);
     apply_scene(S_READY);
     printf("Grok Orb 1.75C\n  1-8  estados (conectando, lista, escuchando, pensando, hablando, sin conexión, ajustes, red)\n"
            "  ←/→  estado anterior/siguiente   B  mantener para hablar   S  captura   Q  salir\n"
            "  Ratón: tocar = caricia, deslizar hacia arriba o pulsar la barra inferior = ajustes\n");
     for(;;){
-        uint32_t idle=lv_timer_handler();keys();refresh();
-        SDL_Delay(idle<1?1:idle>10?10:idle);
+        refresh();uint32_t idle=lv_timer_handler();keys();
+        SDL_Delay(idle<1?1:idle>4?4:idle);
     }
 }
