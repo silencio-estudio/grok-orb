@@ -1,6 +1,8 @@
 # Grok Bot ESP32 Companion
 
-[简体中文](README.md) · [Setup guide](docs/GETTING_STARTED.zh-CN.md) · [Validation](docs/VALIDATION.md)
+[简体中文](README.md) · [Setup guide](docs/GETTING_STARTED.zh-CN.md) · [Validation](docs/VALIDATION.md) · [1.75C port (ES)](docs/PORT_1.75C.md)
+
+> **Grok Orb fork:** this fork adds an untested-on-hardware port to the **Waveshare ESP32-S3-Touch-AMOLED-1.75C** and Spanish voice/UI with a configurable timezone (default Europe/Madrid). See [docs/PORT_1.75C.md](docs/PORT_1.75C.md). The original project is [vliuyt/grok-bot-esp32-bridge](https://github.com/vliuyt/grok-bot-esp32-bridge).
 
 A standalone companion-pet firmware for the **Waveshare ESP32-S3-Touch-AMOLED-1.43C** and a macOS bridge to an existing Grok Bot. The round-screen pet blinks, breathes and responds locally to touch. Hold the physical BOOT button to talk; release to receive the Bot's native voice, with its conversation context and task capabilities.
 
@@ -41,7 +43,7 @@ This release is **source-only**. It does not include a precompiled `.bin`. Insta
 
 A reference device completed ten recognized Chinese acoustic rounds, a 37.1-second continuous response, Wi-Fi rollback, USB provisioning, BLE service advertisement, silent task-result recovery with and without SSE, and a real two-hour quiet soak. Native first audio reached the Mac in 737–1097 ms (median 862.5 ms); actual device-audible latency was not independently measured.
 
-The proactive-behavior clock is currently fixed to Shanghai time (UTC+8), with no timezone setting.
+The proactive-behavior clock follows the bridge's timezone (`GROK_TIMEZONE`, default `Europe/Madrid` in this fork); the voice language is set with `GROK_LANGUAGE` (default `es`).
 
 Full acoustic interruption/reconnection, physical touch feel, authenticated BLE provisioning and battery behavior still require acceptance. Public packaging changes were host-tested; a second-device clean install has not been tested. See [validation and limitations](docs/VALIDATION.md) for precise boundaries.
 

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { bridgeLocale } from './locale.mjs';
 
 export class BridgeError extends Error {
   constructor(code, message, status) { super(message); this.code = code; this.status = status; }
@@ -13,9 +14,9 @@ function allowedGateway(value) {
   return url.toString().replace(/\/$/, '');
 }
 export class Backend {
-  constructor(auth, { fetch = globalThis.fetch, version = '0.71.2' } = {}) {
+  constructor(auth, { fetch = globalThis.fetch, version = '0.71.2', timeZone = bridgeLocale().timeZone } = {}) {
     Object.defineProperties(this, { auth: { value: auth }, fetch: { value: fetch } });
-    this.version = version;
+    this.version = version; this.timeZone = timeZone;
   }
   async request(url, body, headers, uncertain = false, signal) {
     let response;
@@ -42,7 +43,7 @@ export class Backend {
       authorization: `Bearer ${this.auth.accessToken}`, 'connect-protocol-version': '1',
       'x-cursor-client-type': 'sand', 'x-cursor-client-version': this.version,
       'x-sand-box-namespace': 'prod', 'x-ghost-mode': 'true', 'x-request-id': randomUUID(),
-      'x-cursor-timezone': 'Asia/Shanghai',
+      'x-cursor-timezone': this.timeZone,
       ...(this.auth.teamId ? { 'x-cursor-team-id': this.auth.teamId } : {})
     }, method === 'VoiceCallHarnessTool', signal);
   }

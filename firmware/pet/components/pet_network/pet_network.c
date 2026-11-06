@@ -66,19 +66,19 @@ static void network_task(void *unused){
  for(;;){
   candidate_t next;
   if(xQueueReceive(candidates,&next,pdMS_TO_TICKS(500))==pdTRUE){
-   cb.status(false,"正在验证新网络",cb.context);
+   cb.status(false,"Comprobando la red nueva",cb.context);
    bool ok=pet_network_transaction(&next.config,(pet_transaction_ops_t){.connect=candidate_connect,.commit=candidate_commit,.restore=candidate_restore});
    cb.result(next.id,ok,cb.context);pet_config_wipe(&next,sizeof(next));retry=0;
   }
   if(atomic_load(&asleep)){if(atomic_load(&online))esp_wifi_disconnect();continue;}
   if(!atomic_load(&online)){
-   cb.status(false,"Wi-Fi 连接中，离线互动可用",cb.context);
+   cb.status(false,"Conectando Wi-Fi (funciona sin red)",cb.context);
    pet_config_t c=cb.current(cb.context);bool ok=connect_saved(&c);pet_config_wipe(&c,sizeof(c));
-   if(ok){retry=0;cb.status(true,"Wi-Fi 已连接",cb.context);}
-   else {cb.status(false,"Wi-Fi 未连接，离线互动可用",cb.context);retry++;}
+   if(ok){retry=0;cb.status(true,"Wi-Fi conectado",cb.context);}
+   else {cb.status(false,"Sin Wi-Fi (funciona sin red)",cb.context);retry++;}
    /* Interruptible backoff: provisioning and wake stay responsive. */
    for(unsigned i=0;i<(retry>6?60:retry*5)&&!atomic_load(&online)&&uxQueueMessagesWaiting(candidates)==0;i++)vTaskDelay(pdMS_TO_TICKS(100));
-  }else {cb.status(true,"Wi-Fi 已连接",cb.context);}
+  }else {cb.status(true,"Wi-Fi conectado",cb.context);}
  }
 }
 esp_err_t pet_network_start(pet_network_callbacks_t callbacks){

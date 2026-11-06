@@ -6,7 +6,7 @@ export class RealtimeSession extends EventEmitter {
     super(); this.socketFactory = socketFactory; this.now = now; this.state = 'idle';
     this.turn = 0; this.cancelled = new Set(); this.toolCalls = new Set(); this.pendingTools = new Set(); this.updates = [];
   }
-  async open({ credential, plan, onTool = async () => ({ error: 'Tool unavailable' }), voice = null, language = 'zh' }) {
+  async open({ credential, plan, onTool = async () => ({ error: 'Tool unavailable' }), voice = null, language = 'es' }) {
     if (this.state !== 'idle') throw new Error('Session already opened');
     if (Number(credential.expiresAtUnixSeconds) * 1000 <= this.now() + 5000 || !Number.isFinite(Number(credential.expiresAtUnixSeconds))) throw new Error('Voice credential expired');
     const url = new URL(credential.websocketUrl);

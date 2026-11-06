@@ -1,0 +1,7 @@
+# Waveshare ESP32-S3-Touch-AMOLED-1.75C, applied after sdkconfig.defaults by
+# firmware/tools/build_pet.py --board 175c. The flash header says 16 MB so
+# the image also boots on 16 MB units; 32 MB units keep the upper half intact.
+CONFIG_PET_BOARD_WAVESHARE_175C=y
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=n
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_175c.csv"

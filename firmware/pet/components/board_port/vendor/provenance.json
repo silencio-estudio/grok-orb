@@ -8,6 +8,14 @@
     "modified": true
   },
   {
+    "source": "firmware/pet/components/board_port/vendor/board_waveshare_s3_143c.c",
+    "destination": "board_waveshare_s3_175c.c",
+    "sha256": "0015b05ef33e6425da4f689f5a865235b26be8f6a9e4a624f1f5393947bacc5b",
+    "license": "Apache-2.0",
+    "originNote": "Local 1.75C adaptation of this project's 1.43C board file, cross-checked against Waveshare's Apache-2.0 1.75C BSP and CST9217 driver; original adapted Meta notices retained. Not validated on hardware yet.",
+    "modified": true
+  },
+  {
     "source": "muse-gadget-sdk/esp32/components/muse/boards/muse_lcd_bands.c",
     "destination": "muse_lcd_bands.c",
     "sha256": "8195b4e1f719a9742671f096885319b331bfed505acfbf4962b6bed269ee5135",

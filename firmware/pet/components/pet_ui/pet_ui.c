@@ -12,7 +12,8 @@
 #include <string.h>
 
 extern const lv_font_t muse_font_cjk_16;
-static lv_font_t font;
+extern const lv_font_t pet_font_latin_16;
+static lv_font_t font,latin;
 static SemaphoreHandle_t view_lock,ready_signal;
 static pet_ui_view_t view;
 static pet_ui_callback_t callback;
@@ -77,7 +78,7 @@ static void switch_changed(lv_event_t *event){
     action(kind,lv_obj_has_state(o,LV_STATE_CHECKED));
 }
 static lv_obj_t *toggle(lv_obj_t *parent,const char *text,int y){
-    lv_obj_t *txt=label(parent,text,120);lv_obj_set_pos(txt,115,y+4);
+    lv_obj_t *txt=label(parent,text,160);lv_obj_set_pos(txt,105,y+4);
     lv_obj_t *o=lv_switch_create(parent);lv_obj_set_size(o,48,25);lv_obj_set_pos(o,280,y);
     lv_obj_set_style_bg_color(o,lv_color_hex(0xfa2c99),LV_PART_INDICATOR|LV_STATE_CHECKED);
     lv_obj_add_event_cb(o,switch_changed,LV_EVENT_VALUE_CHANGED,NULL);return o;
@@ -133,16 +134,16 @@ static void draw(lv_timer_t *timer){
         lv_obj_set_pos(smiles[i],x-6,(int)(h*.29f));lv_obj_set_flag(smiles[i],LV_OBJ_FLAG_HIDDEN,!happy);
     }
     const char *text=current.captions?current.caption:"";
-    if(current.dialogue==PET_DIALOGUE_LISTEN)text="嗯，我在听";
-    else if(current.dialogue==PET_DIALOGUE_WAIT)text=current.waiting_long?"稍等一下，还在准备回答":"让我想想";
-    else if(p.expression==PET_EXPR_HAPPY)text="再摸一下嘛";
-    else if(p.expression==PET_EXPR_GREET&&p.invitation)text="嘿，我在这里";
+    if(current.dialogue==PET_DIALOGUE_LISTEN)text="Te escucho";
+    else if(current.dialogue==PET_DIALOGUE_WAIT)text=current.waiting_long?"Un momento, sigo preparando la respuesta":"Déjame pensar";
+    else if(p.expression==PET_EXPR_HAPPY)text="¡Otra caricia!";
+    else if(p.expression==PET_EXPR_GREET&&p.invitation)text="¡Hola, estoy aquí!";
     else if(current.dialogue==PET_DIALOGUE_IDLE)text="";
     if(strcmp(last_caption,text)){snprintf(last_caption,sizeof(last_caption),"%s",text);lv_label_set_text(caption,last_caption);}
     lv_obj_set_flag(caption,LV_OBJ_FLAG_HIDDEN,!text[0]);
-    const char *hint=current.connection==PET_CONN_READY?"按住 BOOT 说话":"语音连接中";
-    if(current.dialogue==PET_DIALOGUE_LISTEN)hint="松开 BOOT 后提交";
-    else if(current.connection==PET_CONN_READY&&current.dialogue!=PET_DIALOGUE_IDLE)hint="按住 BOOT 打断";
+    const char *hint=current.connection==PET_CONN_READY?"Mantén BOOT para hablar":"Conectando la voz…";
+    if(current.dialogue==PET_DIALOGUE_LISTEN)hint="Suelta BOOT para enviar";
+    else if(current.connection==PET_CONN_READY&&current.dialogue!=PET_DIALOGUE_IDLE)hint="Mantén BOOT para interrumpir";
     if(strcmp(last_hint,hint)){snprintf(last_hint,sizeof(last_hint),"%s",hint);lv_label_set_text(voice_hint,last_hint);}
     if(page==1){
         syncing=true;lv_slider_set_value(volume_slider,current.volume,LV_ANIM_OFF);
@@ -152,10 +153,10 @@ static void draw(lv_timer_t *timer){
     if(page==2){
         lv_label_set_text(network_label,current.wifi);lv_label_set_text(bridge_label,current.mac);lv_label_set_text(voice_label,current.voice);
         lv_label_set_text(setup_label,current.setup);
-        char code[32];if(current.passkey)snprintf(code,sizeof(code),"配对码 %06d",current.passkey);else code[0]=0;
+        char code[32];if(current.passkey)snprintf(code,sizeof(code),"Código %06d",current.passkey);else code[0]=0;
         lv_label_set_text(passkey_label,code);
     }
-    char battery[32];if(current.battery>=0)snprintf(battery,sizeof(battery),"电量 %d%%",current.battery);else snprintf(battery,sizeof(battery),"小糖");
+    char battery[32];if(current.battery>=0)snprintf(battery,sizeof(battery),"Batería %d%%",current.battery);else snprintf(battery,sizeof(battery),"Grok Orb");
     if(page)lv_label_set_text(power_label,battery);
     if(snap)snapshot();
 }
@@ -177,32 +178,35 @@ static void build(void){
         lv_obj_set_style_bg_opa(smiles[i],LV_OPA_TRANSP,LV_PART_KNOB);lv_obj_remove_flag(smiles[i],LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(smiles[i],LV_OBJ_FLAG_HIDDEN);
     }
     caption=label(root,"",300);lv_obj_set_pos(caption,83,334);lv_obj_set_height(caption,38);lv_label_set_long_mode(caption,LV_LABEL_LONG_WRAP);
-    voice_hint=label(root,"语音连接中",260);lv_obj_set_pos(voice_hint,103,391);
+    voice_hint=label(root,"Conectando la voz…",260);lv_obj_set_pos(voice_hint,103,391);
     lv_obj_remove_flag(voice_hint,LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_text_color(voice_hint,lv_color_hex(0x8b7f87),0);
     handle=lv_button_create(root);lv_obj_remove_style_all(handle);lv_obj_set_size(handle,72,42);lv_obj_align(handle,LV_ALIGN_BOTTOM_MID,0,-8);
     lv_obj_t *bar=lv_obj_create(handle);lv_obj_remove_style_all(bar);lv_obj_set_size(bar,34,3);lv_obj_center(bar);
     lv_obj_set_style_bg_color(bar,lv_color_hex(0x494146),0);lv_obj_set_style_bg_opa(bar,LV_OPA_COVER,0);lv_obj_set_style_radius(bar,2,0);lv_obj_remove_flag(bar,LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(handle,open_drawer,LV_EVENT_CLICKED,NULL);
-    drawer=overlay();lv_obj_t *title=label(drawer,"舒服一点",200);lv_obj_set_pos(title,133,63);
-    volume_slider=slider(drawer,"音量",102,0,100);brightness_slider=slider(drawer,"亮度",164,10,100);
-    quiet_switch=toggle(drawer,"安静陪伴",225);captions_switch=toggle(drawer,"通话字幕",265);speaker_switch=toggle(drawer,"扬声器",305);
-    lv_obj_t *connection=button(drawer,"连接与配网",150,connections);lv_obj_set_pos(connection,158,350);
-    lv_obj_t *back=button(drawer,"返回",70,home);lv_obj_set_pos(back,198,402);
-    connection_page=overlay();title=label(connection_page,"连接与配网",240);lv_obj_set_pos(title,113,58);
+    drawer=overlay();lv_obj_t *title=label(drawer,"Ajustes",200);lv_obj_set_pos(title,133,63);
+    volume_slider=slider(drawer,"Volumen",102,0,100);brightness_slider=slider(drawer,"Brillo",164,10,100);
+    quiet_switch=toggle(drawer,"Modo tranquilo",225);captions_switch=toggle(drawer,"Subtítulos",265);speaker_switch=toggle(drawer,"Altavoz",305);
+    lv_obj_t *connection=button(drawer,"Conexión y red",170,connections);lv_obj_set_pos(connection,148,350);
+    lv_obj_t *back=button(drawer,"Volver",90,home);lv_obj_set_pos(back,188,402);
+    connection_page=overlay();title=label(connection_page,"Conexión y red",240);lv_obj_set_pos(title,113,58);
     network_label=label(connection_page,"",290);lv_obj_set_pos(network_label,88,106);
     bridge_label=label(connection_page,"",290);lv_obj_set_pos(bridge_label,88,143);
     voice_label=label(connection_page,"",290);lv_obj_set_pos(voice_label,88,180);
     setup_label=label(connection_page,"",290);lv_obj_set_pos(setup_label,88,220);
     passkey_label=label(connection_page,"",250);lv_obj_set_pos(passkey_label,108,258);
-    lv_obj_t *setup=button(connection_page,"开启蓝牙配网",168,provision);lv_obj_set_pos(setup,149,294);
-    lv_obj_t *stop=button(connection_page,"关闭配网",130,close_provision);lv_obj_set_pos(stop,168,345);
-    back=button(connection_page,"返回小糖",120,home);lv_obj_set_pos(back,173,396);
+    lv_obj_t *setup=button(connection_page,"Configurar por Bluetooth",230,provision);lv_obj_set_pos(setup,118,294);
+    lv_obj_t *stop=button(connection_page,"Cerrar configuración",200,close_provision);lv_obj_set_pos(stop,133,345);
+    back=button(connection_page,"Volver",120,home);lv_obj_set_pos(back,173,396);
     power_label=label(drawer,"",130);lv_obj_set_pos(power_label,168,28);
     lv_timer_create(draw,33,NULL);
 }
 static void ui_task(void *unused){
-    (void)unused;font=lv_font_montserrat_16;font.fallback=&muse_font_cjk_16;
+    (void)unused;/* Montserrat 16 de LVGL solo trae ASCII: tildes, ñ, ¿ y ¡ salen de la
+     * misma Montserrat (Latin-1) y el resto del CJK de Unifont. */
+    latin=pet_font_latin_16;latin.fallback=&muse_font_cjk_16;
+    font=lv_font_montserrat_16;font.fallback=&latin;
     lv_indev_t *touch_device=NULL;
     if(pet_board_display_start(&touch_device)&&pet_board()->display_lock(-1)){
         build();pet_board()->display_unlock();initialized=true;

@@ -35,6 +35,8 @@ test('native controller binds tools, presence and call record to the chosen bot'
   voice.emit('transcript', { role: 'user', text: 'fixture conversation, never log me' });
   await session.close();
   assert.equal(calls.filter(call => call.method === 'recordVoiceCall').length, 1);
+  assert.equal(calls.find(call => call.method === 'VoiceCallHarnessSession').body.spokenLanguage, 'Spanish');
+  assert.equal(voice.args.language, 'es');
   assert.equal(calls.filter(call => call.method === 'setVoiceCallPresence' && !call.body.isOnTheLine).length, 1);
   const tool = calls.find(call => call.method === 'VoiceCallHarnessTool');
   assert.equal(tool.body.agentId, 'selected');

@@ -23,3 +23,13 @@ To regenerate, obtain that exact upstream OTF and an LVGL-compatible
 file header (size 16, bpp 1, no compression, the three ranges, and
 `--lv-font-name muse_font_cjk_16`). Preserve the notice and OFL after conversion.
 No external private SDK or missing local generation script is required.
+
+# Latin-1 fallback font
+
+`pet_font_latin_16.c` holds Montserrat Medium 16 px, 4 bpp glyphs for
+U+00A0–00FF plus – — ‘ ’ “ ” … €, so Spanish text (á é í ó ú ü ñ ¿ ¡) renders
+in the same family as LVGL's built-in `lv_font_montserrat_16`. The UI chains
+Montserrat 16 → this font → `muse_font_cjk_16`. Conversion options are in the
+file header; source TTF and license are in
+[THIRD_PARTY_NOTICES](../../../../../THIRD_PARTY_NOTICES.md) and
+[Montserrat-OFL-1.1](../../../../../docs/third-party/Montserrat-OFL-1.1.txt).
