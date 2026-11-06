@@ -38,3 +38,8 @@ test('native RPC sends the configured timezone header', async () => {
   await backend.rpc('EnsureSandBox', {});
   assert.equal(headers['x-cursor-timezone'], 'Europe/Madrid');
 });
+
+test('default bot is Grok Orb (decision D2)', async () => {
+  const { DEFAULT_BOT } = await import('../src/locale.mjs');
+  assert.equal(DEFAULT_BOT, 'Grok Orb');
+});

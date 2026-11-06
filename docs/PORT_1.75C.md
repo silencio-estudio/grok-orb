@@ -37,7 +37,7 @@ interfaz `muse_board_t` del proyecto.
 | I2C | SDA 47, SCL 48 | **SDA 15, SCL 14** (táctil, códecs, PMIC e IMU en el mismo bus) | BSP |
 | Audio | ES8311 + ES7210, MCLK 38, BCLK 39, WS 40, DOUT 41, DIN 42, PA 46, LDO de códecs en GPIO 18 | ES8311 + ES7210, **MCLK 16, BCLK 9, WS 45, DOUT 8, DIN 10**, PA 46; sin GPIO de alimentación de códecs | BSP + xiaozhi |
 | Micrófonos | MIC1 + MIC2 del ES7210 | MIC1 + MIC2; MIC3 (`ADC_MIC3_P/N`) es la referencia del altavoz | Esquema |
-| Alimentación | ETA6098 (carga en GPIO 7) y divisor de batería en GPIO 4 | **PMIC AXP2101** en 0x34: ALDO1 alimenta los micrófonos; batería, carga y VBUS se leen por I2C | Ejemplo `01_AXP2101`, xiaozhi, esquema |
+| Alimentación | ETA6098 (carga en GPIO 7) y divisor de batería en GPIO 4 | **PMIC AXP2101** en 0x34: ALDO1 es la red A3V3, que alimenta el ES7210 (y, con él, los micrófonos) y el AVDD del ES8311; batería, carga y VBUS se leen por I2C | Ejemplo `01_AXP2101`, xiaozhi, esquema |
 | Botón | BOOT (GPIO 0) | BOOT (GPIO 0); PWR va al AXP2101 | BSP |
 | IMU | — | QMI8658 en el bus I2C | xiaozhi (no se usa en este port) |
 
@@ -46,14 +46,21 @@ Detalles que no cuadraban con lo que se sabía antes del port:
 - **Flash.** Los ejemplos oficiales no se ponen de acuerdo: tres usan
   `CONFIG_ESPTOOLPY_FLASHSIZE_32MB` y uno (`04_Immersive_block`) `16MB`. El
   firmware de fábrica confirma 32 MiB. El port escribe en la cabecera **16 MB**
-  y su tabla acaba en `0xC20000`, así que funciona en unidades de 16 y de
+  y sus ranuras acaban en `0xC20000` (la tabla, en `0x1000000`), así que funciona en unidades de 16 y de
   32 MiB; el instalador acepta los dos tamaños y siempre copia la flash
   entera, mida lo que mida.
-- **El AXP2101.** El BSP oficial no lo toca: depende de la configuración de
-  arranque del PMIC. xiaozhi y el ejemplo `01_AXP2101` sí configuran DC1 y
-  ALDO1 a 3,3 V y apagan el resto. El port solo pone **ALDO1 a 3,3 V y lo
-  enciende** (lectura-modificación-escritura), y activa la medida de tensión
-  de la batería. No apaga otras salidas ni cambia el cargador.
+- **El AXP2101 queda en solo lectura** (decisión D9). La única escritura que
+  podía hacer falta era ALDO1, porque es la red A3V3: alimenta todo el ES7210
+  (VDDD, VDDP, VDDA, VDDM; los micrófonos van con su MICBIAS) y el AVDD del
+  ES8311 a través de R29. La pantalla va por DCDC1 (VCC3V3). Pero no es
+  imprescindible: la tabla de raíles del esquemático da «ALDO1 VL1 3.3V» como
+  configuración de arranque, y el código de audio de Waveshare cuenta con
+  ello (el BSP 3.0.0 y los ejemplos `06_ES7210` y `07_ES8311` no tocan el
+  AXP2101). xiaozhi/zongzhu-bot y `01_AXP2101` escriben ALDO1 solo porque
+  antes apagan todos los LDO. El port no escribe nada: lee ALDO1 al arrancar
+  y avisa en el log si no está encendido a 3,3 V. Tampoco enciende el ADC de
+  batería: la tensión solo se informa si ya estaba activo, y el porcentaje
+  sale del medidor (`0xA4`). Funciona con y sin batería.
 - **El CST9217** tiene un modo de comandos (`0xD101`) que el driver de
   Waveshare usa para leer la versión. El port no entra en ese modo: hace el
   reset y lee informes, que es lo único que necesita.
@@ -62,8 +69,8 @@ Detalles que no cuadraban con lo que se sabía antes del port:
 
 1. **Board port nuevo**, `firmware/pet/components/board_port/vendor/board_waveshare_s3_175c.c`:
    pantalla CO5300 (mismo envío por bandas que la 1.43C), táctil CST9217 leído
-   por I2C desde LVGL, ES8311/ES7210 en I2S0 a 16 kHz, AXP2101 (ALDO1, batería,
-   carga) y BOOT para hablar. Se elige en compilación con
+   por I2C desde LVGL, ES8311/ES7210 en I2S0 a 16 kHz, AXP2101 en solo lectura (batería,
+   carga, estado de ALDO1) y BOOT para hablar. Se elige en compilación con
    `CONFIG_PET_BOARD_WAVESHARE_175C` (Kconfig en `board_port`); la 1.43C sigue
    siendo la opción por defecto y su archivo no cambia.
 2. **Configuración por placa**: `firmware/pet/sdkconfig.defaults.175c` se aplica
@@ -71,7 +78,9 @@ Detalles que no cuadraban con lo que se sabía antes del port:
    `partitions_175c.csv`, placa 1.75C). `build_pet.py --board 175c` la usa.
 3. **Particiones** (`firmware/pet/partitions_175c.csv`): mismo offset de tabla
    (`0x10000`) y mismos primeros sectores que la 1.43C (`nvs`, `otadata`,
-   `phy_init`) y dos ranuras de 6 MiB:
+   `phy_init`), dos ranuras de 6 MiB y, al final de los 16 MiB de la cabecera,
+   `prod_data`/`prod_bak` como en la tabla Muse (decisión D6; el firmware no
+   las usa):
 
    | Nombre | Tipo | Inicio | Tamaño |
    |---|---|---:|---:|
@@ -80,6 +89,8 @@ Detalles que no cuadraban con lo que se sabía antes del port:
    | phy_init | data/phy | `0x1F000` | `0x1000` |
    | ota_0 | app/ota_0 | `0x20000` | `0x600000` |
    | ota_1 | app/ota_1 | `0x620000` | `0x600000` |
+   | prod_data | data/0x40 | `0xFFE000` | `0x1000` |
+   | prod_bak | data/0x41 | `0xFFF000` | `0x1000` |
 
 4. **Instalador** (`firmware/tools/pet_install.py --board 'Waveshare ESP32-S3-Touch-AMOLED-1.75C'`), ver abajo.
 5. **Español**: voz (`spokenLanguage: 'Spanish'`, `language_hint: 'es'`), textos
@@ -208,13 +219,23 @@ GROK_TIMEZONE=Atlantic/Canary node src/cli.mjs device --bot "Nombre del Bot"
 GROK_LANGUAGE=en node src/cli.mjs serve --bot "Nombre del Bot"   # es (defecto), en, zh
 ```
 
+El bot por defecto es **«Grok Orb»** (decisión D2): sin `--bot` ni
+`GROK_BOT_NAME`, el puente busca ese nombre.
+
 - La zona va en la cabecera `x-cursor-timezone` del Bot y en el mensaje
   `clock` hacia la placa, que ahora incluye `offsetMin` (desfase UTC en ese
   momento, con horario de verano). Se reenvía cada 30 s, así que el cambio de
   hora se aplica solo. Un puente antiguo sin `offsetMin` sigue con UTC+8.
 - La pantalla usa Montserrat 16 (la misma de antes) y una conversión de
   Montserrat Medium con Latin-1 (á é í ó ú ü ñ ¿ ¡ ç…), comillas, guiones, «…»
-  y € como respaldo; detrás sigue la fuente CJK de Unifont.
+  y € como respaldo.
+- **Idioma de la pantalla por Kconfig** (decisión D3), en `menuconfig` →
+  *Grok pet interface* → *Interface language*: español (por defecto) o chino.
+  Todos los textos de la placa están en `components/pet_strings/pet_strings.h`.
+  La fuente CJK de Unifont (`muse_font_cjk_16.c`) **solo se compila en el build
+  en chino**; en español no entra en el binario.
+- **Nombre en pantalla** con `CONFIG_PET_DISPLAY_NAME` (mismo menú), «Grok Orb»
+  por defecto: es lo que aparece encima de Ajustes cuando no hay batería.
 
 ## Pendiente de comprobar en la placa
 
@@ -224,7 +245,8 @@ No se ha podido verificar sin hardware:
   por bandas del proyecto, y que la orientación es la correcta.
 - Que el táctil responde leyendo los informes sin pasar por el modo de
   comandos, y que el espejo de ejes coincide con la pantalla.
-- Que los micrófonos dan señal con solo ALDO1 encendido y que MIC1/MIC2 son los
+- Que ALDO1 llega encendido a 3,3 V (si no, el log lo avisa y habría que
+  decidir si se escribe), que los micrófonos dan señal y que MIC1/MIC2 son los
   buenos; el volumen y la ganancia del altavoz.
 - Las lecturas del AXP2101 (porcentaje, tensión y estado de carga).
 - Leer 32 MiB con esptool 5.6.0 (direcciones por encima de 16 MiB) y el tiempo

@@ -1,4 +1,5 @@
 #include "pet_network.h"
+#include "pet_strings.h"
 #include "pet_transaction.h"
 #include "pet_discovery_filter.h"
 #include "esp_event.h"
@@ -66,19 +67,19 @@ static void network_task(void *unused){
  for(;;){
   candidate_t next;
   if(xQueueReceive(candidates,&next,pdMS_TO_TICKS(500))==pdTRUE){
-   cb.status(false,"Comprobando la red nueva",cb.context);
+   cb.status(false,PET_STR_WIFI_CHECKING_NEW,cb.context);
    bool ok=pet_network_transaction(&next.config,(pet_transaction_ops_t){.connect=candidate_connect,.commit=candidate_commit,.restore=candidate_restore});
    cb.result(next.id,ok,cb.context);pet_config_wipe(&next,sizeof(next));retry=0;
   }
   if(atomic_load(&asleep)){if(atomic_load(&online))esp_wifi_disconnect();continue;}
   if(!atomic_load(&online)){
-   cb.status(false,"Conectando Wi-Fi (funciona sin red)",cb.context);
+   cb.status(false,PET_STR_WIFI_CONNECTING,cb.context);
    pet_config_t c=cb.current(cb.context);bool ok=connect_saved(&c);pet_config_wipe(&c,sizeof(c));
-   if(ok){retry=0;cb.status(true,"Wi-Fi conectado",cb.context);}
-   else {cb.status(false,"Sin Wi-Fi (funciona sin red)",cb.context);retry++;}
+   if(ok){retry=0;cb.status(true,PET_STR_WIFI_CONNECTED,cb.context);}
+   else {cb.status(false,PET_STR_WIFI_DISCONNECTED,cb.context);retry++;}
    /* Interruptible backoff: provisioning and wake stay responsive. */
    for(unsigned i=0;i<(retry>6?60:retry*5)&&!atomic_load(&online)&&uxQueueMessagesWaiting(candidates)==0;i++)vTaskDelay(pdMS_TO_TICKS(100));
-  }else {cb.status(true,"Wi-Fi conectado",cb.context);}
+  }else {cb.status(true,PET_STR_WIFI_CONNECTED,cb.context);}
  }
 }
 esp_err_t pet_network_start(pet_network_callbacks_t callbacks){

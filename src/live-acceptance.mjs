@@ -6,11 +6,12 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { loadAuth } from './auth.mjs';
 import { Backend } from './backend.mjs';
 import { NativeBotSession } from './native-bot.mjs';
+import { DEFAULT_BOT } from './locale.mjs';
 import { MacAudio, projectRoot } from './mac-audio.mjs';
 
 const run = promisify(execFile);
 const backend = new Backend(await loadAuth());
-const bots = await backend.listBots(); const matches = bots.filter(bot => bot.name === (process.env.GROK_BOT_NAME ?? '小糖'));
+const bots = await backend.listBots(); const matches = bots.filter(bot => bot.name === (process.env.GROK_BOT_NAME ?? DEFAULT_BOT));
 if (matches.length !== 1) throw new Error('BOT_NOT_UNIQUE');
 const session = new NativeBotSession({ backend, bot: matches[0] });
 const audio = new MacAudio(); let audioBytes = 0, taskReturns = 0, toolCalls = 0, faults = [], transcript = [], stats = [];
@@ -51,7 +52,7 @@ try {
   session.voice.socket.addEventListener('message', event => {
     try { const { type } = JSON.parse(event.data); if (typeof type === 'string') eventCounts[type] = (eventCounts[type] ?? 0) + 1; } catch {}
   });
-  console.log(JSON.stringify({ phase: 'native-ready', bot: '小糖' }));
+  console.log(JSON.stringify({ phase: 'native-ready', bot: matches[0].name }));
   await speakTurn('你好小糖，这是一次中文语音连通测试。请记住，本次测试的水果是苹果。请只回复记住了。', 1);
   const previous = transcript.length;
   await speakTurn('我刚才告诉你的测试水果是什么？请只说出水果的名字。', 2);

@@ -34,7 +34,8 @@ PARTITIONS = [('nvs',1,2,0x11000,0xc000),('otadata',1,0,0x1d000,0x2000),
 # firmware/pet/partitions_175c.csv
 PARTITIONS_175C = [('nvs',1,2,0x11000,0xc000),('otadata',1,0,0x1d000,0x2000),
                    ('phy_init',1,1,0x1f000,0x1000),('ota_0',0,0x10,APP_OFFSET,0x600000),
-                   ('ota_1',0,0x11,0x620000,0x600000)]
+                   ('ota_1',0,0x11,0x620000,0x600000),('prod_data',1,0x40,0xffe000,0x1000),
+                   ('prod_bak',1,0x41,0xfff000,0x1000)]
 PROFILES = {
     BOARD: {'flash':(FLASH_BYTES,),'partitions':PARTITIONS,'app_end':APP_END,
             'record':'device-backup.json','backup':'before-pet-full.bin',

@@ -6,6 +6,8 @@ export const LANGUAGES = {
   en: { spoken: 'English', hint: 'en' },
   zh: { spoken: 'Chinese', hint: 'zh' },
 };
+// Bot de Grok Bot por defecto (decisión D2); se cambia con --bot o GROK_BOT_NAME.
+export const DEFAULT_BOT = 'Grok Orb';
 export const DEFAULT_LANGUAGE = 'es';
 export const DEFAULT_TIMEZONE = 'Europe/Madrid';
 

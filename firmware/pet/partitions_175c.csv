@@ -3,8 +3,12 @@
 # first sectors as the 1.43C layout, so the installer's guards apply to both;
 # two 6 MiB app slots end at 0xC20000, inside 16 MiB, so the layout fits
 # both 16 MiB and 32 MiB flash. The remaining flash is left untouched.
+# prod_data/prod_bak keep the Muse layout's two records at the end of the
+# 16 MiB the header declares (decision D6); the firmware does not use them.
 nvs,       data, nvs,     0x11000,  0xC000,
 otadata,   data, ota,     0x1D000,  0x2000,
 phy_init,  data, phy,     0x1F000,  0x1000,
 ota_0,     app,  ota_0,   0x20000,  0x600000,
 ota_1,     app,  ota_1,   0x620000, 0x600000,
+prod_data, data, 0x40,    0xFFE000, 0x1000,
+prod_bak,  data, 0x41,    0xFFF000, 0x1000,

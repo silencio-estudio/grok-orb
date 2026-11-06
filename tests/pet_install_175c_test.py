@@ -50,7 +50,7 @@ class LayoutTests(unittest.TestCase):
             name, kind, sub, offset, size = [x.strip() for x in line.split(',')[:5]]
             kinds = {'app': 0, 'data': 1}
             subs = {'nvs': 2, 'ota': 0, 'phy': 1, 'ota_0': 0x10, 'ota_1': 0x11}
-            rows.append((name, kinds[kind], subs[sub], int(offset, 16), int(size, 16)))
+            rows.append((name, kinds[kind], subs[sub] if sub in subs else int(sub, 16), int(offset, 16), int(size, 16)))
         self.assertEqual(rows, m.PARTITIONS_175C)
         ota0 = next(r for r in rows if r[0] == 'ota_0')
         self.assertEqual(ota0[3], m.APP_OFFSET)
