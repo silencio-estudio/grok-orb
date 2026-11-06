@@ -46,7 +46,7 @@ El ratón hace de dedo: los deslizadores, interruptores y botones de Ajustes y d
 | 3 | Escuchando | BOOT pulsado | [3-escuchando.png](../docs/sim/3-escuchando.png) |
 | 4 | Pensando | BOOT soltado, esperando respuesta | [4-pensando.png](../docs/sim/4-pensando.png) |
 | 5 | Hablando | Audio de respuesta reproduciéndose, con subtítulo | [5-hablando.png](../docs/sim/5-hablando.png) |
-| 6 | Sin conexión | Sin Wi-Fi ni puente (`OFFLINE`) | [6-sin-conexion.png](../docs/sim/6-sin-conexion.png) |
+| 6 | Sin conexión | Sin Wi-Fi ni puente (`OFFLINE`). Como en la placa, el orb se pone gris y dice «Sin conexión» tras 10 s seguidos sin enlace; antes muestra «Conectando la voz…» | [6-sin-conexion.png](../docs/sim/6-sin-conexion.png) |
 | 7 | Ajustes | Página de ajustes | [7-ajustes.png](../docs/sim/7-ajustes.png) |
 | 8 | Conexión y red | Página de conexión | [8-conexion-y-red.png](../docs/sim/8-conexion-y-red.png) |
 
