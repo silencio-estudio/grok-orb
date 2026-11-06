@@ -245,6 +245,10 @@ Cada fase es una PR pequeña contra `main`. Las fases 1 a 6 se comprueban **sin 
 
 Las fases 1–2 y 3–6 son independientes y pueden avanzar en paralelo.
 
+**Solapamiento con la PR #1.** La rama `claude/port-175c-es` (PR #1, abierta antes que este plan) ya hace en un solo bloque buena parte de las fases 1 a 6: placa 1.75C, particiones, instalador, fuente latina y textos en español, además de su propio `docs/PORT_1.75C.md`. Antes de seguir con más fases hay que decidir cuál de las dos ramas manda, para que no choquen al fusionar.
+
+**Pruebas de aceptación.** Mientras sus frases sigan en chino, `live-acceptance.mjs` y `*-task-acceptance.mjs` fijan la voz a `zh`. Para `hardware-interrupt.mjs`, que usa un puente ya arrancado, hay que lanzar ese puente con `--language zh`.
+
 ---
 
 ## 5. Riesgos y copia de seguridad
