@@ -84,9 +84,10 @@ Reset: pulso por GPIO2 y nivel activo bajo, según xiaozhi. Espejo en X e Y.
 
 No existe en la 1.43C. Hay que **añadir** un pequeño driver I2C (registros, sin librería pesada) que:
 
+- **Solo lectura** (D9): no se escribe ningún registro de raíles ni de carga en la primera versión.
 - **Lea**: porcentaje de batería (0xA4), estado de carga y presencia de VBUS (0x00/0x01), tensión de batería. Sustituye a `read_power()` y su ADC.
 - **Encienda** el raíl de los micrófonos/códecs antes de abrirlos (`codec_power`), si el esquemático confirma qué raíl es.
-- Implemente `power_off` (apagado por software), con lo que aparece «Apagar» en Ajustes.
+- `power_off` (apagado por software, Â«ApagarÂ» en Ajustes) y el apagado con PWR quedan para la fase 8 (D8).
 - Más adelante: leer la IRQ de pulsación corta de PWRON para `MUSE_BTN_POWER_PRESS`.
 
 **Cuidado:** el constructor `Pmic` de xiaozhi apaga todos los DCDC salvo DC1 y todos los LDO salvo ALDO1, y cambia la tensión de carga (4,1 V) y la corriente (200 mA). Copiarlo a ciegas puede dejar sin alimentación algo que la placa necesita o cambiar la carga de la batería. Plan: la primera versión **solo lee** y enciende el raíl confirmado. Cualquier escritura de configuración se justifica con el esquemático y el ejemplo oficial `01_AXP2101`.
@@ -143,7 +144,7 @@ prod_bak,  data, 0x41,     0x1FFF000, 0x1000,
 - Dos ranuras de app de casi 8 MB (hoy la app ocupa 2,2 MB: `0x22E8E0`, comprobado con el build de `fcbd820`). Hay margen para fuentes y animaciones.
 - `coredump` (128 KB) para diagnosticar fallos en la placa nueva sin depurador.
 - `storage` (~16 MB) libre para el futuro (sonidos, assets); el firmware no lo monta hasta que haga falta.
-- `prod_data`/`prod_bak` se conservan al final, como en Muse. El firmware actual no las usa (ver duda D6).
+- `prod_data`/`prod_bak` se conservan al final, como en Muse. El firmware actual no las usa (decisiÃ³n D6).
 
 ### 2.2 Qué pasa con el instalador guardado
 
@@ -186,10 +187,10 @@ Cadenas en chino que se ven en la placa, por archivo:
 
 Plan:
 
-- Sacar todas las cadenas a `components/pet_ui/pet_strings.h` (una tabla `PET_STR_*`), con `pet_strings_es.c` y, si se quiere conservar, `pet_strings_zh.c`. Se elige con `CONFIG_PET_LANG_ES` / `_ZH` (ver duda D3).
+- Sacar todas las cadenas a `components/pet_ui/pet_strings.h` (una tabla `PET_STR_*`), con `pet_strings_es.c` y, si se quiere conservar, `pet_strings_zh.c`. Se elige con `CONFIG_PET_LANG_ES` / `_ZH` (decisiÃ³n D3: espaÃ±ol por defecto, y la fuente CJK solo con `_ZH`).
 - **Fuente:** la Montserrat que trae LVGL solo cubre ASCII (0x20–0x7E). Faltan `á é í ó ú ü ñ Ñ ¿ ¡` y saldrían como cuadros. Hay que generar con `lv_font_conv` una Montserrat 16 (OFL, la misma familia y tamaño que ya se usan, así no cambia la tipografía) con los rangos `0x20-0x7E,0xA0-0xFF,0x2026,0x2019,0x201C,0x201D`. La fuente Unifont CJK (`muse_font_cjk_16.c`, ~155.000 líneas) queda solo para la variante en chino.
 - **Maquetación:** las etiquetas de `pet_ui.c` van en posiciones absolutas pensadas para el ancho de los ideogramas (p. ej. `label(root,…,260)` en 103,391). En español los textos son 2–3 veces más largos («Conexión y configuración de red»). Hay que revisar cada etiqueta dentro del círculo de 466 px: textos cortos, `LV_LABEL_LONG_WRAP` y centrado. Comprobación con `pet.snapshot` por USB (ya existe en `pet_console.c`) una vez instalada.
-- Nombre en pantalla: hoy, sin batería se muestra «小糖» (el nombre del bot). Pasa a ser el nombre configurado (duda D2).
+- Nombre en pantalla: hoy, sin batería se muestra «小糖» (el nombre del bot). Pasa a ser `CONFIG_PET_DISPLAY_NAME`, Â«Grok OrbÂ» por defecto (decisiÃ³n D2).
 
 ### 3.2 Textos y voz del puente (`src/`)
 
@@ -202,7 +203,7 @@ Plan:
 | `src/control.mjs`, `src/setup-page.mjs` | `lang="zh-CN"` y textos de los paneles | `lang="es"` y textos en español |
 | `src/live-acceptance.mjs`, `hardware-interrupt.mjs`, `device-task-acceptance.mjs`, `pet-silent-task-acceptance.mjs`, `firmware/tools/hardware_acceptance.py` | Frases de prueba en chino | Frases en español (las de reconocimiento de voz tienen que tener sentido en español) |
 | `native/Info.plist` | `NSMicrophoneUsageDescription` en chino | En español |
-| `*.command` | Lanzadores con nombre en chino | Renombrar (duda D7) |
+| `*.command` | Lanzadores con nombre en chino | Renombrar en la fase 9 (D7) |
 
 Las instrucciones («prompts») de la voz **no están en este repo**: llegan del servicio (`VoiceCallHarnessSession`) según `spokenLanguage`. No hay plantilla local que traducir. Riesgo: no sabemos si el servicio acepta `'Spanish'` con ese valor exacto. Se comprueba en la fase 1 con la prueba de voz solo en el Mac (`npm start -- serve`), sin placa.
 
@@ -232,14 +233,15 @@ Cada fase es una PR pequeña contra `main`. Las fases 1 a 6 se comprueban **sin 
 | Fase | PR | Contenido | Cómo se comprueba |
 |---|---|---|---|
 | 0 | Este documento | Plan | `npm test` (79 pasan, 3 omitidos: son las comprobaciones de dependencias del target, que se saltan sin build); el build actual de 1.43C compila (app `0x22E8E0`, 44 % libre) |
-| 1 | Puente en español + zona horaria | §3.2 y la parte del puente de §3.3 (`utcOffsetMin`, cabecera, `spokenLanguage`, `language_hint`, textos, configuración) | `npm test` con tests nuevos de configuración, zona y cambio de hora. Prueba manual de voz **solo en el Mac** (`npm start -- serve`) para confirmar que el servicio acepta `Spanish` |
+| 1 | Puente en español + zona horaria | §3.2 y la parte del puente de §3.3 (`utcOffsetMin`, cabecera, `spokenLanguage`, `language_hint`, textos de los paneles y de la CLI, bot «Grok Orb» por defecto). Las frases de las pruebas de aceptación (`live-acceptance.mjs`, `hardware-interrupt.mjs`, `*-task-acceptance.mjs`, `hardware_acceptance.py`) necesitan una voz de síntesis en español y se traducen al preparar la fase 7 | `npm test` con tests nuevos de configuración, zona y cambio de hora. Prueba manual de voz **solo en el Mac** (`npm start -- serve`) para confirmar que el servicio acepta `Spanish` |
 | 2 | Reloj del firmware | `pet_link.c` usa `utcOffsetMin`; se quita el `+8*3600` | `npm test` (harness C de `pet_link`); build 1.43C |
 | 3 | Selección de placa | Kconfig de placa, `sdkconfig.defaults.<placa>`, particiones por placa, `build_pet.py --board`, nombre de placa en estado/BLE desde `pet_board()->name`. **Sin** código de la 1.75C todavía | Build 1.43C con el mismo `sdkconfig` efectivo que antes (comparar hash) y la misma app |
 | 4 | Placa 1.75C | `board_waveshare_s3_175c.c`, `axp2101.c` en modo lectura + raíl de los códecs, CST9217, tabla de 32 MB (§2.1), procedencia y licencias | Build `--board 175c` correcto, app ≤ `0x7E0000`; test de host que detecta GPIOs repetidos o fuera de rango en las placas; build 1.43C sin cambios |
 | 5 | Interfaz en español | Tabla de cadenas, Montserrat 16 con Latin-1, revisión de la maquetación | Build de las dos placas; test de host que comprueba que todos los caracteres de `pet_strings_es.c` están en la fuente y que ninguna cadena supera su ancho máximo |
 | 6 | Instalador multiplaca | §2.2: perfiles, copia de 32 MB, `migrate`, `restore-full` | `npm test` + `tests/pet_install_test.py` con esptool simulado. Nunca contra la placa |
 | 7 | Primera instalación (manual, Ángel) | Copia completa → `migrate` → configuración de red por USB → `npm start` con la placa | Lista de `docs/VALIDATION.md` adaptada: pantalla, táctil, BOOT, voz en español, hora de Madrid, batería, eco |
-| 8 | Extras | PWR por la IRQ del AXP2101, `power_off`, RTC para hora sin Mac, QMI8658 | Build y prueba en la placa |
+| 8 | Extras | Apagado con PWR (4 s, D8), `power_off`, RTC y zona en la placa para tener hora sin Mac, QMI8658 | Build y prueba en la placa |
+| 9 | Documentación en español (D7) | `README.md`, `GETTING_STARTED`, `VALIDATION`, renombrar los `.command` | `npm test`, `check-publication.py` |
 
 Las fases 1–2 y 3–6 son independientes y pueden avanzar en paralelo.
 
@@ -308,18 +310,20 @@ Cuando exista la fase 6, `pet_install.py backup --board "Waveshare ESP32-S3-Touc
 
 ---
 
-## 6. Dudas para Ángel
+## 6. Decisiones
 
-Cada una lleva una recomendación por defecto; con eso el plan sigue adelante si no se dice lo contrario.
+Tomadas el 2026-11-06 en nombre de Ángel. Sustituyen a las recomendaciones de las secciones anteriores donde no coincidan.
 
-| # | Duda | Recomendación |
-|---|---|---|
-| D1 | ¿Seguimos dando soporte a la 1.43C en este fork o solo a la 1.75C? | Mantener las dos: sale casi gratis con la selección de placa (fase 3) y conserva los tests y la ruta de upstream |
-| D2 | ¿Cómo se llama el bot en Grok Bot (hoy `--bot 小糖` por defecto) y qué nombre se ve en pantalla? | Pásame el nombre exacto del bot |
-| D3 | Interfaz: ¿solo español o elegible español/chino? | Elegible por Kconfig, español por defecto. Deja la fuente CJK fuera del build en español |
-| D4 | Hora: ¿el Mac manda el desfase (recomendado) o la placa guarda la zona y usa el RTC? | Desfase desde el Mac ahora; RTC y zona en la placa en la fase 8 |
-| D5 | ¿Qué firmware tiene ahora la placa (el de fábrica de Waveshare, xiaozhi o zongzhu-bot)? ¿Hay algo en ella que quieras conservar? | Da igual para el plan si hay copia completa, pero ayuda a saber qué tabla de particiones esperar |
-| D6 | ¿Conservamos `prod_data`/`prod_bak` (herencia de Muse, sin uso) en la tabla de 32 MB? | Sí: 8 KB y menos diferencias con upstream |
-| D7 | ¿Traducimos también la documentación (`README.md`, `GETTING_STARTED`) y renombramos los `.command` en chino? | Sí, en una PR aparte al final, para no mezclar con firmware |
-| D8 | Botón PWR: ¿pulsación corta para algo (pantalla o hablar) y larga para apagar, o solo apagar? | Solo apagar (4 s) en la primera versión |
-| D9 | ¿Tiene batería conectada tu placa (SKU 33691) o va siempre por USB (33692)? | Condiciona cuándo se prueba la batería y el AXP2101 |
+| # | Pregunta | Decisión | Consecuencia en el plan |
+|---|---|---|---|
+| D1 | ¿Soporte para la 1.43C? | Se mantienen las dos placas | Fase 3 (selección de placa) obligatoria; cada PR de firmware compila las dos |
+| D2 | Nombre del bot | Bot **«Grok Orb»** y nombre en pantalla «Grok Orb», configurables | Puente: `--bot` (y `GROK_BOT_NAME`) con «Grok Orb» por defecto (fase 1). Firmware: `CONFIG_PET_DISPLAY_NAME` con «Grok Orb» por defecto (fase 5) |
+| D3 | Idioma de la interfaz | Elegible por Kconfig, español por defecto, **sin la fuente CJK en el build en español** | Fase 5: `CONFIG_PET_LANG_ES` / `_ZH`; `muse_font_cjk_16.c` solo se compila con `_ZH` |
+| D4 | Hora | Desfase desde el Mac ahora; RTC y zona en la placa en la fase 8 | Fases 1 y 2 según §3.3 |
+| D5 | Firmware actual de la placa | **Desconocido.** Antes de cualquier flasheo se hace copia completa y se lee la tabla de particiones de esa copia; no se asume ninguna | El instalador (fase 6) no supone ninguna tabla de origen: `migrate` solo exige una copia completa verificada del mismo dispositivo, y la tabla de fábrica se documenta a partir de esa copia (§5.2, paso 5) |
+| D6 | `prod_data`/`prod_bak` | Se conservan | Tabla de §2.1 sin cambios |
+| D7 | Traducir documentación y `.command` | Sí, en una PR aparte al final | Nueva fase 9 |
+| D8 | Botón PWR | Solo apagar (4 s) en la primera versión | Fase 8: sin acción con pulsación corta |
+| D9 | Batería | Se asume alimentación por USB; el AXP2101 en **solo lectura** y funcionando con o sin batería | Fase 4: `read_power` devuelve `battery_pct = -1` si no hay batería (bit de presencia del AXP2101) y no se escriben registros de carga ni de raíles. Si los códecs necesitan un raíl que llega apagado, se documenta y se decide antes de escribir nada |
+
+Ninguna fase de este plan flashea la placa ni ejecuta instaladores sobre ella. La fase 7 la hace Ángel a mano.
