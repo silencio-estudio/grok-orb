@@ -88,7 +88,7 @@ Común a los dos temas (`firmware/pet/components/pet_ui/pet_motion.c`):
 
 - **Transiciones de estado en 320 ms:** escala, altura, giro y mirada siguen la pose de `pet_core` con muelles críticamente amortiguados. No rebotan y, partiendo de reposo, recorren el camino en forma de S (arranque y frenada suaves); llegan al 95 % en 320 ms. Si el estado cambia a mitad, conservan la velocidad y la transición se encadena.
 - **Ojos:** el mismo tipo de muelle en 110 ms. El parpadeo cierra hacia el centro, y la sonrisa aparece cuando los ojos ya se han cerrado.
-- **Respiración en reposo:** un seno de 4 s que solo cambia la escala (`transform_scale`, 1/256). Entra y sale en 400 ms.
+- **Respiración en reposo:** un seno uniforme de 4 s entre el 96 % y el máximo círculo inscrito de 466 px, centrado en (233, 233). Entra y sale en 400 ms. El suave cuantiza la escala a 1/256 hacia dentro en el máximo; el pixel conserva bloques de 8 px y descarta los que sobresaldrían del círculo físico.
 - **Refresco reducido en reposo:** cuando solo respira, el dibujo baja a 55 ms (unos 18 fps), y LVGL solo pinta si la escala cambia de verdad. Con cualquier cambio vuelve al refresco normal en el siguiente fotograma.
 - **Sin conexión:** el color pasa al gris con `--ease-io3` (Cubic, `cubic-bezier(0.645, 0.045, 0.355, 1)`) en 320 ms. En el tema de 8 bits la mezcla se hace con tramado.
 
@@ -98,3 +98,5 @@ La ventana refresca a 60 Hz con vsync (`LV_DEF_REFR_PERIOD 16` en `lv_conf.h`); 
 
 `--bench` da el coste por fotograma con el periodo de la placa. El tiempo de QSPI sale de los píxeles a 2 bytes y 20 MB/s (40 MHz, 4 líneas). La CPU es la del Mac: sirve para comparar, no es la del S3.
 
+
+La respiración a pantalla completa mantiene los periodos de refresco. Medición orientativa en Mac: reposo suave ≈230 ms QSPI/s y 438 µs CPU por paso; pixel ≈158 ms QSPI/s y 192 µs CPU por paso. El lienzo pixel pasa de 32² a 60²: dos buffers ARGB8888 ocupan 28 800 bytes (antes 8192). No se ha medido CPU/FPS en hardware ni flasheado la placa.

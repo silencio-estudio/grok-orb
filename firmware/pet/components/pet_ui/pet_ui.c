@@ -81,7 +81,7 @@ static pet_spring_t s_scale_x,s_scale_y,s_offset,s_rotation,s_eye,s_look,s_breat
 static pet_tween_t offline_tween;
 static int64_t last_us;
 #if PIXEL_THEME
-#define PIXEL_BLOCKS 32   /* lienzo de 32 bloques de 8 px; el orb ocupa unos 27 (≈ los 224 px del suave) y respira dentro */
+#define PIXEL_BLOCKS 60   /* 480 px: contiene el círculo de 466 px, con margen para el tramado */
 #define PIXEL_FRAME_US 125000   /* 8 fotogramas por segundo */
 static uint8_t pixel_buf[PIXEL_BLOCKS*PIXEL_BLOCKS*4] __attribute__((aligned(4)));
 static uint8_t pixel_next[sizeof(pixel_buf)];
@@ -209,6 +209,12 @@ static void motion_step(const pet_pose_t *p,int64_t now_us){
  * que no salte al dar la vuelta ningún contador. Es un seno: ease-in-out por sí mismo. */
 #define BREATH_PERIOD_US 4000000
 static float breath(int64_t now_us){return s_breath.value*sinf((float)(now_us%BREATH_PERIOD_US)/BREATH_PERIOD_US*6.2831853f);}
+/* Uniform inward breathing: the largest idle silhouette is the inscribed circle.
+ * Blend through the existing spring so entering/leaving idle stays continuous. */
+static float idle_scale(int64_t now_us){
+    float wave=(1+sinf((float)(now_us%BREATH_PERIOD_US)/BREATH_PERIOD_US*6.2831853f))*.5f;
+    return (466.0f/224.0f)*(1-.04f*wave);
+}
 /* Mezcla entre el color del orb y el de sin conexión, con --ease-io3 (Cubic) en 320 ms. */
 static int offline_mix(bool offline,int64_t now_us){
     float now=(float)(now_us%600000000)/1e6f;
@@ -232,6 +238,8 @@ static void pixel_orb(uint8_t *buf,float sx,float sy,float offset,float rotation
     float c=PIXEL_BLOCKS/2.0f,cy=c+offset/8,rx=13.4f*sx,ry=13.4f*sy,a=-rotation*3.14159265f/180,ca=cosf(a),sa=sinf(a);
     for(int y=0;y<PIXEL_BLOCKS;y++)for(int x=0;x<PIXEL_BLOCKS;x++){
         float dx0=x+.5f-c,dy0=y+.5f-cy,dx=dx0*ca-dy0*sa,dy=dx0*sa+dy0*ca;
+        float edge_x=fabsf(dx0)*8+4,edge_y=fabsf(y+.5f-c)*8+4;
+        if(edge_x*edge_x+edge_y*edge_y>233*233)continue;
         if((dx*dx)/(rx*rx)+(dy*dy)/(ry*ry)>1)continue;
         float nx=dx/rx,ny=dy/ry,nz=sqrtf(fmaxf(0,1-nx*nx-ny*ny));
         float light=fmaxf(0,-.45f*nx-.6f*ny+.66f*nz);   /* luz normalizada (-0,45, -0,6, 0,66) */
@@ -282,16 +290,21 @@ static void draw(lv_timer_t *timer){
     int64_t frame=now_us/PIXEL_FRAME_US;
     if(frame!=pixel_frame){
         pixel_frame=frame;float b=breath(now_us);
-        pixel_orb(pixel_next,s_scale_x.value-.025f*b,s_scale_y.value+.055f*b,s_offset.value,s_rotation.value,s_eye.value,s_look.value,smile,mix);
+        float idle=fminf(1,fmaxf(0,s_breath.value)),grow=idle*(idle_scale(now_us)*112.0f/107.2f-1);
+        lv_obj_set_y(body,210-PIXEL_BLOCKS/2+(int)lroundf(23*idle));
+        pixel_orb(pixel_next,s_scale_x.value+grow-.025f*b*(1-idle),s_scale_y.value+grow+.055f*b*(1-idle),s_offset.value,s_rotation.value,s_eye.value,s_look.value,smile,mix);
         if(memcmp(pixel_next,pixel_buf,sizeof(pixel_buf))){memcpy(pixel_buf,pixel_next,sizeof(pixel_buf));lv_obj_invalidate(body);}
     }
 #else
     uint32_t color=lv_color_to_u32(lv_color_mix(lv_color_hex(C_OFFLINE),lv_color_hex(C_ORB),(uint8_t)mix))&0xffffff;
     float b=breath(now_us);
+    float idle=fminf(1,fmaxf(0,s_breath.value)),grow=idle*(idle_scale(now_us)-1);
     /* Escala con transform_scale (1/256): el borde se mueve por debajo del píxel. */
-    int sx=(int)lroundf((s_scale_x.value-.010f*b)*256),sy=(int)lroundf((s_scale_y.value+.025f*b)*256);
+    int sx=(int)lroundf((s_scale_x.value+grow-.010f*b*(1-idle))*256),sy=(int)lroundf((s_scale_y.value+grow+.025f*b*(1-idle))*256);
+    /* Never round the maximum idle diameter beyond the physical circle. */
+    if(idle>.999f){if(sx>532)sx=532;if(sy>532)sy=532;}
     int rotation=(int)lroundf(s_rotation.value*10);
-    lv_obj_set_y(body,98+(int)lroundf(s_offset.value));
+    lv_obj_set_y(body,98+(int)lroundf(s_offset.value+23*idle));
     if(sx!=last_sx){last_sx=sx;lv_obj_set_style_transform_scale_x(body,sx,0);}
     if(sy!=last_sy){last_sy=sy;lv_obj_set_style_transform_scale_y(body,sy,0);}
     if(rotation!=last_rotation){last_rotation=rotation;lv_obj_set_style_transform_rotation(body,rotation,0);}
