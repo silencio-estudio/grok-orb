@@ -18,9 +18,9 @@ menu "Grok pet interface"
         default PET_THEME_SMOOTH
         help
             Smooth: the round pink orb with anti-aliased Montserrat text.
-            8-bit: four colours from the same palette, Unifont pixel text,
-            square widgets and an orb drawn in 8 px blocks at 8 frames/s.
-            Both use the same spring-based motion.
+            8-bit: a 16-colour PICO-8-style palette, pixel text (Press Start 2P
+            titles, Unifont body), square widgets and a dithered orb drawn in
+            8 px blocks at 8 frames/s. Both use the same spring-based motion.
 
         config PET_THEME_SMOOTH
             bool "Smooth"
