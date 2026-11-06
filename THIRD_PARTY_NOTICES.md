@@ -19,7 +19,7 @@ Retained files include the board support headers and LCD-band implementation in 
 
 ## GNU Unifont 16.0.04 — OFL-1.1 for the distributed font
 
-`firmware/pet/components/pet_ui/fonts/muse_font_cjk_16.c` is an LVGL C conversion of an unaltered subset of GNU Unifont glyphs. Font copyright:
+`firmware/pet/components/pet_ui/fonts/muse_font_cjk_16.c` and `pet_font_pixel_16.c` (8-bit theme) are LVGL C conversions of unaltered subsets of GNU Unifont glyphs. Font copyright:
 
 Copyright © 1998-2025 Roman Czyborra, Paul Hardy, Qianqian Fang, Andrew Miller, Johnnie Weaver, David Corbett, Nils Moskopp, Rebecca Bettencourt, Ho-Seok Ee, et al.
 
