@@ -262,14 +262,16 @@ static int selftest(void){
 static int bench(void){
     static const scene_t list[]={S_READY,S_LISTEN,S_THINK,S_SPEAK,S_OFFLINE};
     const double qspi_bytes_per_s=40e6*4/8;   /* QSPI a 40 MHz, 4 líneas (board port 1.75C) */
-    printf("estado          px/fotograma  QSPI ms (S3)  CPU us (Mac)\n");
+    printf("estado          px/fotograma  QSPI ms (S3)  CPU us (Mac)  pintados/s  QSPI ms/s (S3)\n");
     for(unsigned i=0;i<sizeof(list)/sizeof(list[0]);i++){
         virtual_ms+=60000;apply_scene(list[i]);advance(list[i]==S_OFFLINE?10600:1500);
-        uint64_t px=0;double cpu=0;const int n=150;
+        uint64_t px=0;double cpu=0;const int n=300;int painted=0;
         for(int k=0;k<n;k++){
-            virtual_ms+=33;flushed_px=0;double t0=seconds();refresh();lv_timer_handler();cpu+=seconds()-t0;px+=flushed_px;
+            virtual_ms+=33;flushed_px=0;double t0=seconds();refresh();lv_timer_handler();cpu+=seconds()-t0;px+=flushed_px;painted+=flushed_px>0;
         }
-        printf("%-15s %12llu %13.1f %13.0f\n",scenes[list[i]].title,(unsigned long long)(px/n),px/(double)n*2/qspi_bytes_per_s*1000,cpu/n*1e6);
+        double secs=n*0.033;
+        printf("%-15s %12llu %13.1f %13.0f %11.1f %15.1f\n",scenes[list[i]].title,(unsigned long long)(px/n),px/(double)n*2/qspi_bytes_per_s*1000,cpu/n*1e6,
+               painted/secs,px*2/qspi_bytes_per_s*1000/secs);
     }
     return 0;
 }
