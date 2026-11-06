@@ -87,7 +87,7 @@ No existe en la 1.43C. Hay que **añadir** un pequeño driver I2C (registros, si
 - **Solo lectura** (D9): no se escribe ningún registro de raíles ni de carga en la primera versión.
 - **Lea**: porcentaje de batería (0xA4), estado de carga y presencia de VBUS (0x00/0x01), tensión de batería. Sustituye a `read_power()` y su ADC.
 - **Encienda** el raíl de los micrófonos/códecs antes de abrirlos (`codec_power`), si el esquemático confirma qué raíl es.
-- `power_off` (apagado por software, Â«ApagarÂ» en Ajustes) y el apagado con PWR quedan para la fase 8 (D8).
+- `power_off` (apagado por software, «Apagar» en Ajustes) y el apagado con PWR quedan para la fase 8 (D8).
 - Más adelante: leer la IRQ de pulsación corta de PWRON para `MUSE_BTN_POWER_PRESS`.
 
 **Cuidado:** el constructor `Pmic` de xiaozhi apaga todos los DCDC salvo DC1 y todos los LDO salvo ALDO1, y cambia la tensión de carga (4,1 V) y la corriente (200 mA). Copiarlo a ciegas puede dejar sin alimentación algo que la placa necesita o cambiar la carga de la batería. Plan: la primera versión **solo lee** y enciende el raíl confirmado. Cualquier escritura de configuración se justifica con el esquemático y el ejemplo oficial `01_AXP2101`.
@@ -144,7 +144,7 @@ prod_bak,  data, 0x41,     0x1FFF000, 0x1000,
 - Dos ranuras de app de casi 8 MB (hoy la app ocupa 2,2 MB: `0x22E8E0`, comprobado con el build de `fcbd820`). Hay margen para fuentes y animaciones.
 - `coredump` (128 KB) para diagnosticar fallos en la placa nueva sin depurador.
 - `storage` (~16 MB) libre para el futuro (sonidos, assets); el firmware no lo monta hasta que haga falta.
-- `prod_data`/`prod_bak` se conservan al final, como en Muse. El firmware actual no las usa (decisiÃ³n D6).
+- `prod_data`/`prod_bak` se conservan al final, como en Muse. El firmware actual no las usa (decisión D6).
 
 ### 2.2 Qué pasa con el instalador guardado
 
@@ -187,10 +187,10 @@ Cadenas en chino que se ven en la placa, por archivo:
 
 Plan:
 
-- Sacar todas las cadenas a `components/pet_ui/pet_strings.h` (una tabla `PET_STR_*`), con `pet_strings_es.c` y, si se quiere conservar, `pet_strings_zh.c`. Se elige con `CONFIG_PET_LANG_ES` / `_ZH` (decisiÃ³n D3: espaÃ±ol por defecto, y la fuente CJK solo con `_ZH`).
+- Sacar todas las cadenas a `components/pet_ui/pet_strings.h` (una tabla `PET_STR_*`), con `pet_strings_es.c` y, si se quiere conservar, `pet_strings_zh.c`. Se elige con `CONFIG_PET_LANG_ES` / `_ZH` (decisión D3: español por defecto, y la fuente CJK solo con `_ZH`).
 - **Fuente:** la Montserrat que trae LVGL solo cubre ASCII (0x20–0x7E). Faltan `á é í ó ú ü ñ Ñ ¿ ¡` y saldrían como cuadros. Hay que generar con `lv_font_conv` una Montserrat 16 (OFL, la misma familia y tamaño que ya se usan, así no cambia la tipografía) con los rangos `0x20-0x7E,0xA0-0xFF,0x2026,0x2019,0x201C,0x201D`. La fuente Unifont CJK (`muse_font_cjk_16.c`, ~155.000 líneas) queda solo para la variante en chino.
 - **Maquetación:** las etiquetas de `pet_ui.c` van en posiciones absolutas pensadas para el ancho de los ideogramas (p. ej. `label(root,…,260)` en 103,391). En español los textos son 2–3 veces más largos («Conexión y configuración de red»). Hay que revisar cada etiqueta dentro del círculo de 466 px: textos cortos, `LV_LABEL_LONG_WRAP` y centrado. Comprobación con `pet.snapshot` por USB (ya existe en `pet_console.c`) una vez instalada.
-- Nombre en pantalla: hoy, sin batería se muestra «小糖» (el nombre del bot). Pasa a ser `CONFIG_PET_DISPLAY_NAME`, Â«Grok OrbÂ» por defecto (decisiÃ³n D2).
+- Nombre en pantalla: hoy, sin batería se muestra «小糖» (el nombre del bot). Pasa a ser `CONFIG_PET_DISPLAY_NAME`, «Grok Orb» por defecto (decisión D2).
 
 ### 3.2 Textos y voz del puente (`src/`)
 
