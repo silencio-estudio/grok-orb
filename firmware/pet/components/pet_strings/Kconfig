@@ -32,6 +32,7 @@ menu "Grok pet interface"
         string "Name shown on screen"
         default "Grok Orb"
         help
-            Name of the orb for on-screen use. Not shown at the moment:
-            the top of Settings only shows the battery level, when there is one.
+            Shown in grey above the title of Settings and of the connection
+            page, followed by the battery level when there is a battery.
+            The main orb screen does not show it.
 endmenu

@@ -61,7 +61,7 @@ static lv_obj_t *root,*body,*caption,*handle,*drawer,*connection_page;
 static lv_obj_t *eyes[2],*smiles[2];   /* en el tema de 8 bits los ojos van dibujados en el lienzo */
 #endif
 static lv_obj_t *volume_slider,*brightness_slider,*quiet_switch,*captions_switch,*speaker_switch;
-static lv_obj_t *network_label,*bridge_label,*voice_label,*setup_label,*passkey_label,*power_label;
+static lv_obj_t *network_label,*bridge_label,*voice_label,*setup_label,*passkey_label,*header_labels[2];
 static bool initialized,screen_on=true,syncing;
 /* Últimos valores enviados: los estilos de transformación de LVGL invalidan el objeto
  * aunque no cambien, y el brillo es un comando por QSPI. Valores imposibles = aún no enviado. */
@@ -312,9 +312,15 @@ static void draw(lv_timer_t *timer){
         char code[32];if(current.passkey)snprintf(code,sizeof(code),PET_STR_PASSKEY_FMT,current.passkey);else code[0]=0;
         lv_label_set_text(passkey_label,code);
     }
-    /* Encima de «Ajustes» solo la batería, y solo si hay batería. */
-    char battery[32];if(current.battery>=0)snprintf(battery,sizeof(battery),PET_STR_BATTERY_FMT,current.battery);else battery[0]=0;
-    if(page)lv_label_set_text(power_label,battery);
+    /* Cabecera de Ajustes y de Conexión: el nombre del orb y, si hay batería, su nivel.
+     * La pantalla principal no lo lleva. */
+    if(page){
+        char header[64];
+        if(current.battery>=0)snprintf(header,sizeof(header),PET_STR_HEADER_BATTERY_FMT,PET_DISPLAY_NAME,current.battery);
+        else snprintf(header,sizeof(header),"%s",PET_DISPLAY_NAME);
+        lv_obj_t *target=header_labels[page-1];
+        if(strcmp(lv_label_get_text(target),header))lv_label_set_text(target,header);
+    }
     if(snap)snapshot();
 }
 static void build(void){
@@ -365,7 +371,12 @@ static void build(void){
     lv_obj_t *setup=button(connection_page,PET_STR_SETUP_BLE,230,provision);lv_obj_set_pos(setup,118,294);
     lv_obj_t *stop=button(connection_page,PET_STR_SETUP_CLOSE,200,close_provision);lv_obj_set_pos(stop,133,345);
     back=button(connection_page,PET_STR_BACK_HOME,120,home);lv_obj_set_pos(back,173,396);
-    power_label=label(drawer,"",130);lv_obj_set_pos(power_label,168,28);
+    /* Línea pequeña en gris encima del título, igual en las dos páginas. */
+    lv_obj_t *pages[2]={drawer,connection_page};
+    for(int i=0;i<2;i++){
+        header_labels[i]=label(pages[i],PET_DISPLAY_NAME,260);lv_obj_set_pos(header_labels[i],103,30);
+        lv_obj_set_style_text_color(header_labels[i],lv_color_hex(C_HINT),0);
+    }
     /* Un dibujo por refresco de pantalla (33 ms en la placa, CONFIG_LV_DEF_REFR_PERIOD). */
     lv_timer_create(draw,LV_DEF_REFR_PERIOD,NULL);
 }
