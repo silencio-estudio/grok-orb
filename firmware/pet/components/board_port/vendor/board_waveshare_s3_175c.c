@@ -31,8 +31,15 @@
  *    01_AXP2101: AXP2101 status, ADC and ALDO1 (microphone supply) registers.
  *  - Liu-zhongxian/zongzhu-bot at 62ebe83, xiaozhi-esp32/main/boards/
  *    waveshare/esp32-s3-touch-amoled-1.75 (the _1_75C branch of config.h).
- * Only ALDO1 is switched on the PMIC; the remaining rails and the charger
- * keep their power-on configuration. The PWR key stays a hardware control.
+ * The PMIC is read-only (decision D9). ALDO1 drives A3V3, the supply of the
+ * ES7210 (VDDD/VDDP/VDDA/VDDM; it also biases both microphones) and of the
+ * ES8311 AVDD (via R29), per the schematic at 4bfdc80. It is on at 3.3 V from
+ * power-up (the schematic's rail table lists "ALDO1 VL1 3.3V"), and Waveshare's
+ * own audio code relies on that: the BSP 3.0.0 and the 06_ES7210 / 07_ES8311
+ * examples never touch the AXP2101. 01_AXP2101 and zongzhu-bot write ALDO1
+ * only because they first switch every LDO off. So nothing is written here;
+ * init only logs if ALDO1 is found off. The display runs from DCDC1 (VCC3V3).
+ * The PWR key stays a hardware control.
  */
 
 #include "driver/gpio.h"
@@ -95,7 +102,7 @@ static const char *TAG = "board";
 #define AXP_IC_TYPE 0x03
 #define AXP_ADC_CTRL 0x30     /* bit 0 battery voltage measurement */
 #define AXP_VBAT_H 0x34       /* battery voltage in mV: 5 high bits here, 8 in 0x35 */
-#define AXP_LDO_ONOFF0 0x90   /* bit 0 ALDO1 */
+#define AXP_LDO_ONOFF0 0x90   /* bit 0 ALDO1 (read only here) */
 #define AXP_ALDO1_VOLT 0x92   /* 500 mV + 100 mV per step */
 #define AXP_BATT_PCT 0xA4
 
@@ -129,20 +136,7 @@ static esp_err_t pmu_read(uint8_t reg, uint8_t *value)
     return i2c_master_transmit_receive(s_pmu, &reg, 1, value, 1, 50);
 }
 
-static esp_err_t pmu_write(uint8_t reg, uint8_t value)
-{
-    const uint8_t data[2] = { reg, value };
-    return i2c_master_transmit(s_pmu, data, sizeof(data), 50);
-}
-
-static esp_err_t pmu_set_bits(uint8_t reg, uint8_t bits)
-{
-    uint8_t value;
-    ESP_RETURN_ON_ERROR(pmu_read(reg, &value), TAG, "PMU read 0x%02x", reg);
-    return (value & bits) == bits ? ESP_OK : pmu_write(reg, value | bits);
-}
-
-/* The ES7210 microphones are fed from ALDO1. Voltage is set before enabling. */
+/* Read-only: ALDO1 (A3V3) feeds both codecs; see the header. */
 static esp_err_t pmu_init(void)
 {
     ESP_RETURN_ON_ERROR(i2c_master_probe(s_i2c, PMU_ADDR, 100), TAG, "AXP2101 probe");
@@ -157,9 +151,13 @@ static esp_err_t pmu_init(void)
     if (id != PMU_CHIP_ID) {
         ESP_LOGW(TAG, "unexpected PMU id 0x%02x", id);
     }
-    ESP_RETURN_ON_ERROR(pmu_write(AXP_ALDO1_VOLT, (3300 - 500) / 100), TAG, "ALDO1 3.3 V");
-    ESP_RETURN_ON_ERROR(pmu_set_bits(AXP_LDO_ONOFF0, 0x01), TAG, "ALDO1 on");
-    ESP_RETURN_ON_ERROR(pmu_set_bits(AXP_ADC_CTRL, 0x01), TAG, "battery ADC");
+    uint8_t volt, onoff;
+    ESP_RETURN_ON_ERROR(pmu_read(AXP_ALDO1_VOLT, &volt), TAG, "ALDO1 voltage");
+    ESP_RETURN_ON_ERROR(pmu_read(AXP_LDO_ONOFF0, &onoff), TAG, "LDO state");
+    int millivolts = 500 + (volt & 0x1F) * 100;
+    if (!(onoff & 0x01) || millivolts != 3300) {
+        ESP_LOGW(TAG, "ALDO1 (codec supply) is %s at %d mV; audio may not start", (onoff & 0x01) ? "on" : "off", millivolts);
+    }
     return ESP_OK;
 }
 
@@ -450,10 +448,14 @@ static esp_err_t read_power(muse_power_t *power)
     if (!(status1 & (1u << 3))) {
         return ESP_OK;
     }
-    uint8_t reg = AXP_VBAT_H, raw[2], pct;
-    ESP_RETURN_ON_ERROR(i2c_master_transmit_receive(s_pmu, &reg, 1, raw, 2, 50), TAG, "battery voltage");
+    uint8_t reg = AXP_VBAT_H, raw[2], pct, adc;
     ESP_RETURN_ON_ERROR(pmu_read(AXP_BATT_PCT, &pct), TAG, "battery level");
-    power->battery_mv = ((raw[0] & 0x1F) << 8) | raw[1];
+    /* Read-only PMIC: the voltage is reported only if the battery ADC is already on. */
+    ESP_RETURN_ON_ERROR(pmu_read(AXP_ADC_CTRL, &adc), TAG, "PMU ADC state");
+    if (adc & 0x01) {
+        ESP_RETURN_ON_ERROR(i2c_master_transmit_receive(s_pmu, &reg, 1, raw, 2, 50), TAG, "battery voltage");
+        power->battery_mv = ((raw[0] & 0x1F) << 8) | raw[1];
+    }
     power->battery_pct = pct > 100 ? 100 : pct;
     return ESP_OK;
 }
