@@ -25,11 +25,16 @@ static lv_obj_t *root,*body,*eyes[2],*smiles[2],*caption,*handle,*drawer,*connec
 static lv_obj_t *volume_slider,*brightness_slider,*quiet_switch,*captions_switch,*speaker_switch;
 static lv_obj_t *network_label,*bridge_label,*voice_label,*setup_label,*passkey_label,*power_label;
 static bool initialized,screen_on=true,syncing;
+/* Últimos valores enviados: los estilos de transformación de LVGL invalidan el objeto
+ * aunque no cambien, y el brillo es un comando por QSPI. Valores imposibles = aún no enviado. */
+static int last_brightness=-1,last_w=-1,last_h=-1,last_rotation=-100000;
 static int page,requested_page=-1;
 static bool snapshot_requested;
 static int touch_x,touch_y;
 static bool touching;
 static char last_caption[321],last_hint[64];
+static int64_t lost_at;
+static bool offline_shown;
 static lv_obj_t *voice_hint;
 static void action(pet_ui_action_kind_t kind,int value){if(callback)callback((pet_ui_action_t){kind,value},callback_context);}
 static lv_obj_t *label(lv_obj_t *parent,const char *text,int width){
@@ -67,7 +72,7 @@ static void slider_changed(lv_event_t *event){
     if(lv_event_get_code(event)==LV_EVENT_VALUE_CHANGED)action(o==volume_slider?PET_UI_VOLUME:PET_UI_BRIGHTNESS,lv_slider_get_value(o));
 }
 static lv_obj_t *slider(lv_obj_t *parent,const char *text,int y,int min,int max){
-    lv_obj_t *txt=label(parent,text,100);lv_obj_set_pos(txt,110,y);
+    lv_obj_t *txt=label(parent,text,220);lv_obj_set_style_text_align(txt,LV_TEXT_ALIGN_LEFT,0);lv_obj_set_pos(txt,123,y);
     lv_obj_t *s=lv_slider_create(parent);lv_obj_set_size(s,220,8);lv_obj_set_pos(s,123,y+33);
     lv_slider_set_range(s,min,max);lv_obj_set_style_bg_color(s,lv_color_hex(0x4b3341),LV_PART_MAIN);
     lv_obj_set_style_bg_color(s,lv_color_hex(0xfa2c99),LV_PART_INDICATOR);
@@ -81,8 +86,9 @@ static void switch_changed(lv_event_t *event){
     action(kind,lv_obj_has_state(o,LV_STATE_CHECKED));
 }
 static lv_obj_t *toggle(lv_obj_t *parent,const char *text,int y){
-    lv_obj_t *txt=label(parent,text,160);lv_obj_set_pos(txt,105,y+4);
-    lv_obj_t *o=lv_switch_create(parent);lv_obj_set_size(o,48,25);lv_obj_set_pos(o,280,y);
+    lv_obj_t *txt=label(parent,text,160);lv_obj_set_style_text_align(txt,LV_TEXT_ALIGN_LEFT,0);lv_obj_set_pos(txt,123,y+4);
+    /* Borde derecho del interruptor (295+48) alineado con el de los deslizadores (123+220). */
+    lv_obj_t *o=lv_switch_create(parent);lv_obj_set_size(o,48,25);lv_obj_set_pos(o,295,y);
     lv_obj_set_style_bg_color(o,lv_color_hex(0xfa2c99),LV_PART_INDICATOR|LV_STATE_CHECKED);
     lv_obj_add_event_cb(o,switch_changed,LV_EVENT_VALUE_CHANGED,NULL);return o;
 }
@@ -120,15 +126,18 @@ static void draw(lv_timer_t *timer){
     pet_pose_t p=current.pose;
     if(p.screen_on!=screen_on){
         screen_on=p.screen_on;pet_board()->panel_sleep(!screen_on);
-        if(screen_on)lv_obj_invalidate(root);
+        if(screen_on){lv_obj_invalidate(root);last_brightness=-1;}
     }
     if(!screen_on){if(snap)snapshot();return;}
     int brightness=p.dim?current.brightness/4:current.brightness;
-    pet_board()->set_brightness(brightness<5?5:brightness);
-    int w=(int)(224*p.scale_x),h=(int)(224*p.scale_y);
+    if(brightness<5)brightness=5;
+    if(brightness!=last_brightness){last_brightness=brightness;pet_board()->set_brightness(brightness);}
+    int w=(int)(224*p.scale_x),h=(int)(224*p.scale_y),rotation=(int)(p.rotation*10);
     lv_obj_set_size(body,w,h);lv_obj_set_pos(body,(466-w)/2,210-h/2+(int)p.offset_y);
-    lv_obj_set_style_transform_pivot_x(body,w/2,0);lv_obj_set_style_transform_pivot_y(body,h/2,0);
-    lv_obj_set_style_transform_rotation(body,(int)(p.rotation*10),0);
+    if(w!=last_w||h!=last_h){
+        last_w=w;last_h=h;lv_obj_set_style_transform_pivot_x(body,w/2,0);lv_obj_set_style_transform_pivot_y(body,h/2,0);
+    }
+    if(rotation!=last_rotation){last_rotation=rotation;lv_obj_set_style_transform_rotation(body,rotation,0);}
     bool happy=p.expression==PET_EXPR_HAPPY||p.expression==PET_EXPR_SLEEP;
     for(unsigned i=0;i<2;i++){
         int x=(int)(w*(i?.5223f:.2411f))+(int)p.look_x;
@@ -144,7 +153,13 @@ static void draw(lv_timer_t *timer){
     else if(current.dialogue==PET_DIALOGUE_IDLE)text="";
     if(strcmp(last_caption,text)){snprintf(last_caption,sizeof(last_caption),"%s",text);lv_label_set_text(caption,last_caption);}
     lv_obj_set_flag(caption,LV_OBJ_FLAG_HIDDEN,!text[0]);
-    const char *hint=current.connection==PET_CONN_READY?PET_STR_HINT_TALK:PET_STR_HINT_CONNECTING;
+    /* Sin conexión solo tras 10 s seguidos sin enlace: al arrancar y en cada reintento
+     * pet_link alterna CONNECTING y OFFLINE, y el orb no debe parpadear. */
+    int64_t now=esp_timer_get_time();
+    if(current.connection==PET_CONN_READY)lost_at=0;else if(!lost_at)lost_at=now;
+    bool offline=lost_at&&now-lost_at>=10000000;
+    if(offline!=offline_shown){offline_shown=offline;lv_obj_set_style_bg_color(body,lv_color_hex(offline?0x6b6267:0xfa2c99),0);}
+    const char *hint=current.connection==PET_CONN_READY?PET_STR_HINT_TALK:offline?PET_STR_OFFLINE:PET_STR_HINT_CONNECTING;
     if(current.dialogue==PET_DIALOGUE_LISTEN)hint=PET_STR_HINT_RELEASE;
     else if(current.connection==PET_CONN_READY&&current.dialogue!=PET_DIALOGUE_IDLE)hint=PET_STR_HINT_INTERRUPT;
     if(strcmp(last_hint,hint)){snprintf(last_hint,sizeof(last_hint),"%s",hint);lv_label_set_text(voice_hint,last_hint);}
@@ -159,7 +174,8 @@ static void draw(lv_timer_t *timer){
         char code[32];if(current.passkey)snprintf(code,sizeof(code),PET_STR_PASSKEY_FMT,current.passkey);else code[0]=0;
         lv_label_set_text(passkey_label,code);
     }
-    char battery[32];if(current.battery>=0)snprintf(battery,sizeof(battery),PET_STR_BATTERY_FMT,current.battery);else snprintf(battery,sizeof(battery),"%s",PET_DISPLAY_NAME);
+    /* Encima de «Ajustes» solo la batería, y solo si hay batería. */
+    char battery[32];if(current.battery>=0)snprintf(battery,sizeof(battery),PET_STR_BATTERY_FMT,current.battery);else battery[0]=0;
     if(page)lv_label_set_text(power_label,battery);
     if(snap)snapshot();
 }
@@ -203,7 +219,8 @@ static void build(void){
     lv_obj_t *stop=button(connection_page,PET_STR_SETUP_CLOSE,200,close_provision);lv_obj_set_pos(stop,133,345);
     back=button(connection_page,PET_STR_BACK_HOME,120,home);lv_obj_set_pos(back,173,396);
     power_label=label(drawer,"",130);lv_obj_set_pos(power_label,168,28);
-    lv_timer_create(draw,33,NULL);
+    /* Un dibujo por refresco de pantalla (33 ms en la placa, CONFIG_LV_DEF_REFR_PERIOD). */
+    lv_timer_create(draw,LV_DEF_REFR_PERIOD,NULL);
 }
 static void ui_task(void *unused){
     (void)unused;/* Montserrat 16 de LVGL solo trae ASCII: tildes, ñ, ¿ y ¡ salen de la
