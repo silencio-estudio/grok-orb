@@ -1,4 +1,5 @@
 #include "pet_app.h"
+#include "pet_strings.h"
 #include "board_port.h"
 #include "pet_store.h"
 #include "pet_audio.h"
@@ -147,8 +148,8 @@ static void refresh(void){
     ui.pose=pet_pose(&s,now);ui.dialogue=s.dialogue;ui.connection=s.connection;
     ui.volume=c.volume;ui.brightness=c.brightness;ui.quiet=c.quiet;ui.captions=c.captions;ui.speaker=c.speaker;
     ui.task_channel=s.task_channel;ui.waiting_long=s.dialogue==PET_DIALOGUE_WAIT&&now-s.entered_ms>=20000;
-    snprintf(ui.mac,sizeof(ui.mac),"%s",mac_connected?"Puente del Mac conectado":network_connected?"Buscando el Mac emparejado":"Esperando la red");
-    snprintf(ui.voice,sizeof(ui.voice),"%s",s.connection==PET_CONN_READY?(s.task_channel?"Voz nativa lista":"Voz lista; recuperando tareas"):"Voz nativa aún no lista");
+    snprintf(ui.mac,sizeof(ui.mac),"%s",mac_connected?PET_STR_MAC_CONNECTED:network_connected?PET_STR_MAC_SEARCHING:PET_STR_MAC_WAITING_NETWORK);
+    snprintf(ui.voice,sizeof(ui.voice),"%s",s.connection==PET_CONN_READY?(s.task_channel?PET_STR_VOICE_READY:PET_STR_VOICE_READY_NO_TASKS):PET_STR_VOICE_NOT_READY);
     pet_ui_view_t current=ui;xSemaphoreGive(metadata_lock);
     pet_ui_update(&current);pet_config_wipe(&c,sizeof(c));
 }
@@ -194,17 +195,17 @@ void app_main(void){
     if(pet_board_init()!=ESP_OK){ESP_LOGE("pet","BOARD_START_FAILED");return;}
     pet_init(&model,now_ms());model.seed=esp_random()|1u;model.quiet=config.quiet;model.muted=!config.speaker;
     model.day=config.quota_day;model.greetings_today=config.quota_count;
-    ui.battery=-1;snprintf(ui.wifi,sizeof(ui.wifi),"Preparando Wi-Fi");snprintf(ui.setup,sizeof(ui.setup),"Desde aquí: configurar por Bluetooth");
+    ui.battery=-1;snprintf(ui.wifi,sizeof(ui.wifi),PET_STR_WIFI_PREPARING);snprintf(ui.setup,sizeof(ui.setup),PET_STR_SETUP_HINT);
     pet_console_start();
     if(pet_ui_start(ui_action,NULL)!=ESP_OK){ESP_LOGE("pet","UI_START_FAILED");return;}
     pet_audio_callbacks_t audio_cb={.event=audio_event,.capture=capture,.stopped=stopped,.credit=credit,.fault=audio_fault};
     if(pet_audio_start(&config,audio_cb)!=ESP_OK){ESP_LOGE("pet","AUDIO_START_FAILED");}
     pet_provision_callbacks_t provisioning={.current=current_config,.status=setup_status,.window=setup_window};
-    if(pet_provision_start(provisioning)!=ESP_OK)pet_app_setup_status("Sin Bluetooth: configura por USB",0);
+    if(pet_provision_start(provisioning)!=ESP_OK)pet_app_setup_status(PET_STR_NO_BLUETOOTH,0);
     pet_network_callbacks_t networking={.current=current_config,.commit=commit_network,.status=network_status,.result=network_result};
-    if(pet_network_start(networking)!=ESP_OK)pet_app_network(false,"Wi-Fi no arrancó (funciona sin red)");
+    if(pet_network_start(networking)!=ESP_OK)pet_app_network(false,PET_STR_WIFI_START_FAILED);
     pet_app_bind_transport((pet_transport_t){.control=pet_link_control,.capture=pet_link_capture,.credit=pet_link_credit,.reconnect=pet_link_reconnect,.sleep=pet_link_sleep});
-    if(pet_link_start((pet_link_callbacks_t){.config=current_config,.state=link_state,.event=link_event,.caption=link_caption,.status=link_status})!=ESP_OK)pet_app_setup_status("No arrancó la conexión de voz",0);
+    if(pet_link_start((pet_link_callbacks_t){.config=current_config,.state=link_state,.event=link_event,.caption=link_caption,.status=link_status})!=ESP_OK)pet_app_setup_status(PET_STR_LINK_START_FAILED,0);
     bool asleep=false,network_asleep=false;
     for(;;){
         uint64_t now=now_ms();
@@ -239,7 +240,7 @@ void app_main(void){
         }
         if(dirty&&now-dirty_at>=1500&&s.dialogue==PET_DIALOGUE_IDLE){
             xSemaphoreTake(config_lock,portMAX_DELAY);pet_config_t c=config;
-            if(pet_store_save(&c)){dirty=false;}else {dirty_at=now;pet_app_setup_status("No se guardaron los ajustes; reintenta",0);}
+            if(pet_store_save(&c)){dirty=false;}else {dirty_at=now;pet_app_setup_status(PET_STR_SAVE_FAILED,0);}
             pet_config_wipe(&c,sizeof(c));xSemaphoreGive(config_lock);
         }
         atomic_store(&phase,30);refresh();atomic_store(&phase,31);vTaskDelay(pdMS_TO_TICKS(10));

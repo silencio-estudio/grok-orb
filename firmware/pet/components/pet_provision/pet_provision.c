@@ -1,4 +1,5 @@
 #include "sdkconfig.h"
+#include "pet_strings.h"
 #include "pet_provision.h"
 #include "pet_setup_guard.h"
 #include "cJSON.h"
@@ -59,7 +60,7 @@ static bool submit_locked(const char *text){
  }
  if(!pet_config_valid(&candidate)||!candidate.network_count||!pet_setup_request(&guard,id))goto done;
  ok=pet_network_try(&candidate,id);if(!ok)pet_setup_result(&guard,id,false);
- if(ok)cb.status("Comprobando la red; se mantiene la anterior",0,cb.context);
+ if(ok)cb.status(PET_STR_PROV_CHECKING,0,cb.context);
  done:pet_config_wipe(&candidate,sizeof(candidate));
  /* cJSON allocations contain input secrets; wipe every string before freeing. */
  cJSON *stack[64];unsigned count=0;stack[count++]=json;
@@ -81,7 +82,7 @@ bool pet_provision_usb(const char *text){
 }
 void pet_provision_result(const char *id,bool ok){
  xSemaphoreTake(lock,portMAX_DELAY);pet_setup_result(&guard,id,ok);xSemaphoreGive(lock);
- cb.status(ok?"Red guardada; ya puede conectarse":"Falló la prueba; vuelve la red anterior",0,cb.context);
+ cb.status(ok?PET_STR_PROV_SAVED:PET_STR_PROV_FAILED,0,cb.context);
  /* Keep a successful connection available briefly for the client to read its result. */
  if(ok){deadline=now_ms()+10000;}
 }
@@ -113,7 +114,7 @@ static int gap(struct ble_gap_event *event,void *arg){
   if(!atomic_load(&window))return BLE_HS_EAPP;
   if(event->passkey.params.action!=BLE_SM_IOACT_DISP)return BLE_HS_EAPP;
   struct ble_sm_io io={.action=BLE_SM_IOACT_DISP,.passkey=100000+esp_random()%900000};
-  cb.status("Escribe este código al emparejar en el Mac",io.passkey,cb.context);return ble_sm_inject_io(event->passkey.conn_handle,&io);
+  cb.status(PET_STR_PROV_PASSKEY,io.passkey,cb.context);return ble_sm_inject_io(event->passkey.conn_handle,&io);
  }
  return 0;
 }
@@ -132,7 +133,7 @@ void pet_provision_open(bool open){
  if(!lock)return;
  xSemaphoreTake(lock,portMAX_DELAY);deadline=open?now_ms()+300000:0;pet_setup_open(&guard,now_ms(),open?300000:0);atomic_store(&window,open);xSemaphoreGive(lock);
  if(!open){ble_gap_adv_stop();unsigned conn=atomic_load(&connection);if(conn!=BLE_HS_CONN_HANDLE_NONE)ble_gap_terminate(conn,BLE_ERR_REM_USER_CONN_TERM);}
- cb.window(open,cb.context);cb.status(open?"Abre la configuración en Chrome del Mac":"Configuración cerrada",0,cb.context);
+ cb.window(open,cb.context);cb.status(open?PET_STR_PROV_OPEN:PET_STR_PROV_CLOSED,0,cb.context);
 }
 static void timer_task(void *unused){(void)unused;for(;;){if(atomic_load(&window)){if(now_ms()>=deadline)pet_provision_open(false);else advertise();}vTaskDelay(pdMS_TO_TICKS(250));}}
 esp_err_t pet_provision_start(pet_provision_callbacks_t callbacks){

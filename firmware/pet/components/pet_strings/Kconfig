@@ -1,0 +1,21 @@
+menu "Grok pet interface"
+    choice PET_LANG
+        prompt "Interface language"
+        default PET_LANG_ES
+        help
+            Language of the on-screen texts. Spanish needs only the Latin-1
+            Montserrat font; Chinese also links the Unifont CJK font
+            (about 820 KB more in flash).
+
+        config PET_LANG_ES
+            bool "Spanish"
+        config PET_LANG_ZH
+            bool "Chinese (adds the CJK font)"
+    endchoice
+
+    config PET_DISPLAY_NAME
+        string "Name shown on screen"
+        default "Grok Orb"
+        help
+            Shown at the top of Settings when there is no battery reading.
+endmenu
