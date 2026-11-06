@@ -88,7 +88,7 @@ Común a los dos temas (`firmware/pet/components/pet_ui/pet_motion.c`):
 
 - **Transiciones de estado en 320 ms:** escala, altura, giro y mirada siguen la pose de `pet_core` con muelles críticamente amortiguados. No rebotan y, partiendo de reposo, recorren el camino en forma de S (arranque y frenada suaves); llegan al 95 % en 320 ms. Si el estado cambia a mitad, conservan la velocidad y la transición se encadena.
 - **Ojos:** el mismo tipo de muelle en 110 ms. El parpadeo cierra hacia el centro, y la sonrisa aparece cuando los ojos ya se han cerrado.
-- **Respiración en reposo:** un seno uniforme de 4 s entre el 96 % y el máximo círculo inscrito de 466 px, centrado en (233, 233). Entra y sale en 400 ms. El suave cuantiza la escala a 1/256 hacia dentro en el máximo; el pixel conserva bloques de 8 px y descarta los que sobresaldrían del círculo físico.
+- **Respiración en reposo:** un seno uniforme de 4 s entre el 96 % y el diámetro máximo de 442 px (12 px de margen por lado), centrado en (233, 233). En reposo no muestra texto. Entra y sale en 400 ms. El suave cuantiza la escala a 1/256 hacia dentro en el máximo; el pixel conserva bloques de 8 px y descarta los que sobresaldrían del círculo físico.
 - **Refresco reducido en reposo:** cuando solo respira, el dibujo baja a 55 ms (unos 18 fps), y LVGL solo pinta si la escala cambia de verdad. Con cualquier cambio vuelve al refresco normal en el siguiente fotograma.
 - **Sin conexión:** el color pasa al gris con `--ease-io3` (Cubic, `cubic-bezier(0.645, 0.045, 0.355, 1)`) en 320 ms. En el tema de 8 bits la mezcla se hace con tramado.
 

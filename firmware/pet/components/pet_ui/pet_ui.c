@@ -213,7 +213,7 @@ static float breath(int64_t now_us){return s_breath.value*sinf((float)(now_us%BR
  * Blend through the existing spring so entering/leaving idle stays continuous. */
 static float idle_scale(int64_t now_us){
     float wave=(1+sinf((float)(now_us%BREATH_PERIOD_US)/BREATH_PERIOD_US*6.2831853f))*.5f;
-    return (466.0f/224.0f)*(1-.04f*wave);
+    return (442.0f/224.0f)*(1-.04f*wave);
 }
 /* Mezcla entre el color del orb y el de sin conexión, con --ease-io3 (Cubic) en 320 ms. */
 static int offline_mix(bool offline,int64_t now_us){
@@ -302,7 +302,7 @@ static void draw(lv_timer_t *timer){
     /* Escala con transform_scale (1/256): el borde se mueve por debajo del píxel. */
     int sx=(int)lroundf((s_scale_x.value+grow-.010f*b*(1-idle))*256),sy=(int)lroundf((s_scale_y.value+grow+.025f*b*(1-idle))*256);
     /* Never round the maximum idle diameter beyond the physical circle. */
-    if(idle>.999f){if(sx>532)sx=532;if(sy>532)sy=532;}
+    if(idle>.999f){if(sx>505)sx=505;if(sy>505)sy=505;}
     int rotation=(int)lroundf(s_rotation.value*10);
     lv_obj_set_y(body,98+(int)lroundf(s_offset.value+23*idle));
     if(sx!=last_sx){last_sx=sx;lv_obj_set_style_transform_scale_x(body,sx,0);}
@@ -331,6 +331,7 @@ static void draw(lv_timer_t *timer){
     const char *hint=current.connection==PET_CONN_READY?PET_STR_HINT_TALK:offline?PET_STR_OFFLINE:PET_STR_HINT_CONNECTING;
     if(current.dialogue==PET_DIALOGUE_LISTEN)hint=PET_STR_HINT_RELEASE;
     else if(current.connection==PET_CONN_READY&&current.dialogue!=PET_DIALOGUE_IDLE)hint=PET_STR_HINT_INTERRUPT;
+    if(p.expression==PET_EXPR_IDLE&&current.dialogue==PET_DIALOGUE_IDLE)hint="";
     if(strcmp(last_hint,hint)){snprintf(last_hint,sizeof(last_hint),"%s",hint);lv_label_set_text(voice_hint,last_hint);}
     if(page==1){
         syncing=true;lv_slider_set_value(volume_slider,current.volume,LV_ANIM_OFF);
