@@ -42,3 +42,13 @@ U+0020–007E, U+00A0–00FF and – — ‘ ’ “ ” … €, so the 8-bit t
 linked in that theme; Chinese builds chain it to `muse_font_cjk_16`, also
 Unifont. Same upstream OTF and SHA-256 as above, same OFL-1.1 terms; the
 conversion options and the `lv_font_conv` commit are in the file header.
+
+# Title font (8-bit theme)
+
+`pet_font_title_16.c` holds Press Start 2P, 16 px, 1 bpp, for the same ranges
+as the pixel font. The 8-bit theme uses it only for page titles: its glyphs are
+16 px wide, too wide for the longer Spanish texts, which stay in Unifont. It is
+a subset conversion, so under the OFL it is a Modified Version and does not use
+the Reserved Font Name: the C font is called `pet_font_title_16`. Source,
+SHA-256 and converter commit are in the file header; license in
+[PressStart2P-OFL-1.1](../../../../../docs/third-party/PressStart2P-OFL-1.1.txt).

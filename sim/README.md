@@ -22,7 +22,7 @@ La primera vez descarga LVGL `v9.5.0` en `.build/sim/lvgl` (fijado al commit `85
 | `npm run sim:test` | Prueba sin ventana: pasa por el mismo código que las teclas (`B`, `1`–`8`, `←`/`→`, `Espacio`) y comprueba cada estado de `pet_core` |
 | `node sim/sim.mjs --shots <carpeta>` | Capturas en otra carpeta |
 | `node sim/sim.mjs --fps 5` | Abre la ventana y mide 5 s por estado (Lista, Pensando, Hablando): fotogramas pintados por segundo e intervalos entre ellos |
-| `node sim/sim.mjs --bench` | Sin ventana, con bandas de 118 líneas y el periodo de la placa (33 ms): píxeles que se repintan por fotograma, tiempo estimado de QSPI en el S3 y CPU de LVGL en el Mac |
+| `node sim/sim.mjs --bench` | Sin ventana, con bandas de 118 líneas y el periodo de la placa (33 ms), 10 s por estado: píxeles por fotograma, QSPI estimado en el S3 por fotograma y por segundo, fotogramas pintados por segundo y CPU de LVGL en el Mac |
 | `node sim/sim.mjs --build` | Solo compila (`.build/sim/grok-orb-sim`) |
 
 ## Controles
@@ -76,20 +76,21 @@ Diferencias con la placa:
 
 | | Suave | 8 bits |
 |---|---|---|
-| Orb | Círculo con suavizado, escalado por debajo del píxel | 32×32 bloques de 8 px sin suavizado, con brillo arriba a la izquierda |
-| Movimiento | Muelles a cada fotograma (60 Hz en el Mac, 30 en la placa) | Los mismos muelles, pero el orb se redibuja 8 veces por segundo |
-| Texto | Montserrat 16 con suavizado | Unifont 16 px de 1 bit |
-| Paleta | La de siempre | 4 colores: fondo, rosa del orb, rosa claro y gris cálido |
-| Controles | Redondeados | Rectos, con borde rosa en los botones |
+| Orb | Círculo con suavizado, escalado por debajo del píxel | 32×32 bloques de 8 px sin suavizado, con luz arriba a la izquierda y tramado Bayer 4×4 entre 4 tonos de la paleta |
+| Movimiento | Muelles a cada fotograma (60 Hz en el Mac, 30 en la placa; unos 18 en reposo) | Los mismos muelles, pero el orb se redibuja 8 veces por segundo |
+| Texto | Montserrat 16 con suavizado | Títulos en Press Start 2P (16 px por letra) y el resto en Unifont 16 px, el doble de estrecha |
+| Paleta | La de siempre | 16 colores estilo PICO-8; el orb usa la rampa granate, rojo, rosa y blanco, y sin conexión, la de grises |
+| Controles | Redondeados | Rectos, fondo azul oscuro y borde rosa |
 
 ## Movimiento
 
 Común a los dos temas (`firmware/pet/components/pet_ui/pet_motion.c`):
 
-- **Muelles:** escala, altura, giro, ojos y mirada siguen la pose que da `pet_core` con muelles amortiguados. Al cambiar de estado a mitad de un movimiento conservan la velocidad, así que las transiciones se encadenan sin saltos.
-- **Respiración continua en reposo:** sustituye a los saltos de 1 px. Se hace con `transform_scale`, por debajo del píxel, y entra y sale con su propio muelle.
-- **Parpadeo:** los ojos se cierran hacia su centro. La sonrisa (feliz o dormido) aparece cuando los ojos ya se han cerrado.
-- **Sin conexión:** el color pasa del rosa al gris con `--ease-io2` (`cubic-bezier(0.455, 0.03, 0.515, 0.955)`) en 600 ms.
+- **Transiciones de estado en 320 ms:** escala, altura, giro y mirada siguen la pose de `pet_core` con muelles críticamente amortiguados. No rebotan y, partiendo de reposo, recorren el camino en forma de S (arranque y frenada suaves); llegan al 95 % en 320 ms. Si el estado cambia a mitad, conservan la velocidad y la transición se encadena.
+- **Ojos:** el mismo tipo de muelle en 110 ms. El parpadeo cierra hacia el centro, y la sonrisa aparece cuando los ojos ya se han cerrado.
+- **Respiración en reposo:** un seno de 4 s que solo cambia la escala (`transform_scale`, 1/256). Entra y sale en 400 ms.
+- **Refresco reducido en reposo:** cuando solo respira, el dibujo baja a 55 ms (unos 18 fps), y LVGL solo pinta si la escala cambia de verdad. Con cualquier cambio vuelve al refresco normal en el siguiente fotograma.
+- **Sin conexión:** el color pasa al gris con `--ease-io3` (Cubic, `cubic-bezier(0.645, 0.045, 0.355, 1)`) en 320 ms. En el tema de 8 bits la mezcla se hace con tramado.
 
 ## Fluidez y coste en la placa
 

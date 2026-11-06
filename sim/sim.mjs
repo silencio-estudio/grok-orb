@@ -48,7 +48,7 @@ const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
 const ours = [join(sim, 'sim_main.c'), join(firmware, 'pet_ui/pet_ui.c'), join(firmware, 'pet_ui/pet_motion.c'),
   join(firmware, 'pet_core/pet_core.c'),
   // Sin sdkconfig, pet_strings.h elige español: como en la placa, sin la fuente CJK.
-  join(firmware, pixel ? 'pet_ui/fonts/pet_font_pixel_16.c' : 'pet_ui/fonts/pet_font_latin_16.c')];
+  ...(pixel ? ['pet_ui/fonts/pet_font_pixel_16.c', 'pet_ui/fonts/pet_font_title_16.c'] : ['pet_ui/fonts/pet_font_latin_16.c']).map(name => join(firmware, name))];
 // LVGL se compila una vez; lo nuestro, una vez por tema.
 const themeFlags = pixel ? ['-DCONFIG_PET_THEME_PIXEL=1'] : [];
 const themeObjects = join(objects, `theme-${themeArg}`);

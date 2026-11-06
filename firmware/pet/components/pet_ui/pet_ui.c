@@ -22,18 +22,24 @@ extern const lv_font_t muse_font_cjk_16;
 #if defined(CONFIG_PET_THEME_PIXEL) && CONFIG_PET_THEME_PIXEL
 #define PIXEL_THEME 1
 extern const lv_font_t pet_font_pixel_16;
-#define C_BG      0x101010
-#define C_ORB     0xfa2c99
-#define C_LIGHT   0xefc9dd
-#define C_DIM     0x8b7f87
-#define C_TEXT    C_LIGHT
-#define C_HINT    C_DIM
-#define C_PANEL   C_BG
-#define C_BUTTON  C_BG
-#define C_TRACK   C_DIM
-#define C_EYE     C_BG
-#define C_BAR     C_DIM
-#define C_OFFLINE C_DIM
+extern const lv_font_t pet_font_title_16;
+/* Paleta de 16 colores al estilo PICO-8; la interfaz solo usa estos índices. */
+static const uint32_t palette[16]={
+    0x000000,0x1d2b53,0x7e2553,0x008751,0xab5236,0x5f574f,0xc2c3c7,0xfff1e8,
+    0xff004d,0xffa300,0xffec27,0x00e436,0x29adff,0x83769c,0xff77a8,0xffccaa};
+#define C_BG      0x000000   /* 0 */
+#define C_ORB     0xff77a8   /* 14 */
+#define C_LIGHT   0xfff1e8   /* 7 */
+#define C_TEXT    0xfff1e8   /* 7 */
+#define C_HINT    0x83769c   /* 13 */
+#define C_PANEL   0x000000   /* 0 */
+#define C_BUTTON  0x1d2b53   /* 1 */
+#define C_TRACK   0x1d2b53   /* 1 */
+#define C_EYE     0x000000   /* 0 */
+#define C_BAR     0x83769c   /* 13 */
+#define C_OFFLINE 0xc2c3c7   /* 6 */
+/* Rampas de sombra a luz del orb, por índice de paleta. */
+static const uint8_t ramp_orb[4]={2,8,14,7},ramp_offline[4]={5,13,6,7};
 #define RADIUS(r) 0
 #else
 #define PIXEL_THEME 0
@@ -51,7 +57,7 @@ extern const lv_font_t pet_font_latin_16;
 #define C_OFFLINE 0x6b6267
 #define RADIUS(r) (r)
 #endif
-static lv_font_t font,latin;
+static lv_font_t font,latin,title_font;
 static SemaphoreHandle_t view_lock,ready_signal;
 static pet_ui_view_t view;
 static pet_ui_callback_t callback;
@@ -216,15 +222,25 @@ static void put_block(uint8_t *buf,int x,int y,uint32_t rgb){
     if(x<0||y<0||x>=PIXEL_BLOCKS||y>=PIXEL_BLOCKS)return;
     uint8_t *px=buf+(y*PIXEL_BLOCKS+x)*4;px[0]=rgb&0xff;px[1]=(rgb>>8)&0xff;px[2]=(rgb>>16)&0xff;px[3]=0xff;
 }
-/* Orb de bloques: elipse rotada, brillo arriba a la izquierda y ojos de 3 bloques. */
-static void pixel_orb(uint8_t *buf,float sx,float sy,float offset,float rotation,float eye,float look,bool smile,uint32_t color){
+/* Tramado ordenado Bayer 4×4 (umbrales de 0 a 15). */
+static const uint8_t bayer[4][4]={{0,8,2,10},{12,4,14,6},{3,11,1,9},{15,7,13,5}};
+/* Orb de bloques: elipse rotada con luz desde arriba a la izquierda, sombreada con una rampa
+ * de 4 colores de la paleta y tramado entre ellos; ojos de 3 bloques. offline (0..255)
+ * mezcla con tramado la rampa rosa y la gris. */
+static void pixel_orb(uint8_t *buf,float sx,float sy,float offset,float rotation,float eye,float look,bool smile,int offline){
     memset(buf,0,sizeof(pixel_buf));
     float c=PIXEL_BLOCKS/2.0f,cy=c+offset/8,rx=13.4f*sx,ry=13.4f*sy,a=-rotation*3.14159265f/180,ca=cosf(a),sa=sinf(a);
     for(int y=0;y<PIXEL_BLOCKS;y++)for(int x=0;x<PIXEL_BLOCKS;x++){
         float dx0=x+.5f-c,dy0=y+.5f-cy,dx=dx0*ca-dy0*sa,dy=dx0*sa+dy0*ca;
         if((dx*dx)/(rx*rx)+(dy*dy)/(ry*ry)>1)continue;
-        bool shine=(dx+rx*.66f)*(dx+rx*.66f)+(dy+ry*.42f)*(dy+ry*.42f)<2.6f;
-        put_block(buf,x,y,shine?C_LIGHT:color);
+        float nx=dx/rx,ny=dy/ry,nz=sqrtf(fmaxf(0,1-nx*nx-ny*ny));
+        float light=fmaxf(0,-.45f*nx-.6f*ny+.66f*nz);   /* luz normalizada (-0,45, -0,6, 0,66) */
+        /* Rosa de base, sombra tramada abajo a la derecha y blanco solo en el brillo especular. */
+        float spec=light*light;spec*=spec;spec*=spec;
+        float v=.9f+1.3f*light+1.2f*spec,threshold=(bayer[y&3][x&3]+.5f)/16;
+        int step=(int)v;if(step>2)step=2;if(v-step>threshold)step++;
+        const uint8_t *ramp=offline*16>(bayer[y&3][x&3]+.5f)*255?ramp_offline:ramp_orb;
+        put_block(buf,x,y,palette[ramp[step]]);
     }
     /* Centros de los ojos en bloques desde el centro del orb (los del orb suave entre 8). */
     const float ex[2]={-5.75f,2.1f},ey=-2.1f;
@@ -261,16 +277,16 @@ static void draw(lv_timer_t *timer){
      * pet_link alterna CONNECTING y OFFLINE, y el orb no debe parpadear. */
     bool offline=lost_at&&now_us-lost_at>=10000000;
     int mix=offline_mix(offline,now_us);
-    uint32_t color=lv_color_to_u32(lv_color_mix(lv_color_hex(C_OFFLINE),lv_color_hex(C_ORB),(uint8_t)mix))&0xffffff;
 #if PIXEL_THEME
     /* Pocos fotogramas: el orb de bloques solo se recalcula 8 veces por segundo. */
     int64_t frame=now_us/PIXEL_FRAME_US;
     if(frame!=pixel_frame){
         pixel_frame=frame;float b=breath(now_us);
-        pixel_orb(pixel_next,s_scale_x.value-.025f*b,s_scale_y.value+.055f*b,s_offset.value,s_rotation.value,s_eye.value,s_look.value,smile,color);
+        pixel_orb(pixel_next,s_scale_x.value-.025f*b,s_scale_y.value+.055f*b,s_offset.value,s_rotation.value,s_eye.value,s_look.value,smile,mix);
         if(memcmp(pixel_next,pixel_buf,sizeof(pixel_buf))){memcpy(pixel_buf,pixel_next,sizeof(pixel_buf));lv_obj_invalidate(body);}
     }
 #else
+    uint32_t color=lv_color_to_u32(lv_color_mix(lv_color_hex(C_OFFLINE),lv_color_hex(C_ORB),(uint8_t)mix))&0xffffff;
     float b=breath(now_us);
     /* Escala con transform_scale (1/256): el borde se mueve por debajo del píxel. */
     int sx=(int)lroundf((s_scale_x.value-.010f*b)*256),sy=(int)lroundf((s_scale_y.value+.025f*b)*256);
@@ -368,12 +384,12 @@ static void build(void){
     lv_obj_t *bar=lv_obj_create(handle);lv_obj_remove_style_all(bar);lv_obj_set_size(bar,34,3);lv_obj_center(bar);
     lv_obj_set_style_bg_color(bar,lv_color_hex(C_BAR),0);lv_obj_set_style_bg_opa(bar,LV_OPA_COVER,0);lv_obj_set_style_radius(bar,RADIUS(2),0);lv_obj_remove_flag(bar,LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(handle,open_drawer,LV_EVENT_CLICKED,NULL);
-    drawer=overlay();lv_obj_t *title=label(drawer,PET_STR_SETTINGS,200);lv_obj_set_pos(title,133,63);
+    drawer=overlay();lv_obj_t *title=label(drawer,PET_STR_SETTINGS,200);lv_obj_set_pos(title,133,63);lv_obj_set_style_text_font(title,&title_font,0);
     volume_slider=slider(drawer,PET_STR_VOLUME,102,0,100);brightness_slider=slider(drawer,PET_STR_BRIGHTNESS,164,10,100);
     quiet_switch=toggle(drawer,PET_STR_QUIET,225);captions_switch=toggle(drawer,PET_STR_CAPTIONS,265);speaker_switch=toggle(drawer,PET_STR_SPEAKER,305);
     lv_obj_t *connection=button(drawer,PET_STR_CONNECTION,170,connections);lv_obj_set_pos(connection,148,350);
     lv_obj_t *back=button(drawer,PET_STR_BACK,90,home);lv_obj_set_pos(back,188,402);
-    connection_page=overlay();title=label(connection_page,PET_STR_CONNECTION,240);lv_obj_set_pos(title,113,58);
+    connection_page=overlay();title=label(connection_page,PET_STR_CONNECTION,240);lv_obj_set_pos(title,113,58);lv_obj_set_style_text_font(title,&title_font,0);
     network_label=label(connection_page,"",290);lv_obj_set_pos(network_label,88,106);
     bridge_label=label(connection_page,"",290);lv_obj_set_pos(bridge_label,88,143);
     voice_label=label(connection_page,"",290);lv_obj_set_pos(voice_label,88,180);
@@ -401,13 +417,15 @@ static void ui_task(void *unused){
 #if defined(CONFIG_PET_LANG_ZH) && CONFIG_PET_LANG_ZH
     font.fallback=&muse_font_cjk_16;
 #endif
+    /* Títulos en Press Start 2P (16 px de ancho por letra: solo para textos cortos). */
+    title_font=pet_font_title_16;title_font.fallback=&font;
     (void)latin;
 #else
     latin=pet_font_latin_16;
 #if defined(CONFIG_PET_LANG_ZH) && CONFIG_PET_LANG_ZH
     latin.fallback=&muse_font_cjk_16;
 #endif
-    font=lv_font_montserrat_16;font.fallback=&latin;
+    font=lv_font_montserrat_16;font.fallback=&latin;title_font=font;
 #endif
     lv_indev_t *touch_device=NULL;
     if(pet_board_display_start(&touch_device)&&pet_board()->display_lock(-1)){
