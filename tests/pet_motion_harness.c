@@ -32,6 +32,25 @@ int main(void)
     assert(!pet_tween_done(&tw, 1.4f) && pet_tween_done(&tw, 1.5f));
     pet_tween_start(&tw, 3, 7, 0, 0); assert(pet_tween_value(&tw, 0) == 7);
     pet_tween_start(&tw, 0, 1, 5, 1); assert(pet_tween_value(&tw, 4) == 1);   /* reloj que vuelve atrás */
+    /* Cubic y Sine: ease-in-out en los extremos y monótonas. */
+    assert(pet_ease(PET_EASE_IO3, 0.1f) < 0.02f && pet_ease(PET_EASE_IO3, 0.9f) > 0.98f);
+    assert(fabsf(pet_ease(PET_EASE_IO1, 0.5f) - 0.5f) < 0.01f && pet_ease(PET_EASE_IO1, 0.1f) < 0.05f);
+    for (float x = 0, prev = 0; x <= 1; x += 0.01f) { float y = pet_ease(PET_EASE_IO3, x); assert(y >= prev - 1e-5f); prev = y; }
+    pet_tween_start_curve(&tw, PET_EASE_IO3, 0, 1, 0, 0.32f); assert(fabsf(pet_tween_value(&tw, 0.16f) - 0.5f) < 0.02f);
+
+    /* Transición de estado: muelle crítico de 320 ms, en S, sin rebote, entre 250 y 400 ms. */
+    pet_spring_init_settle(&s, 0, 0.32f); s.target = 1;
+    float t95 = -1, max = 0, first = 0;
+    for (int i = 1; i <= 120; i++) {
+        pet_spring_step(&s, 1 / 120.0f);
+        if (i == 1) first = s.value;
+        if (s.value > max) max = s.value;
+        if (t95 < 0 && s.value >= 0.95f) t95 = i / 120.0f;
+    }
+    assert(first < 0.01f);                 /* arranca suave: casi nada en el primer fotograma */
+    assert(max <= 1.0001f);                /* sin rebote */
+    assert(t95 >= 0.25f && t95 <= 0.4f);   /* 250-400 ms */
+    assert(pet_spring_settled(&s, 0.01f));
     puts("PET_MOTION_OK");
     return 0;
 }

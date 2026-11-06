@@ -67,7 +67,7 @@ static bool initialized,screen_on=true,syncing;
  * aunque no cambien, y el brillo es un comando por QSPI. Valores imposibles = aún no enviado. */
 static int last_brightness=-1;
 #if !PIXEL_THEME
-static int last_sx=-1,last_sy=-1,last_rotation=-100000,last_mix=-1;
+static int last_sx=-1,last_sy=-1,last_rotation=-100000,last_mix=-1,last_eye_h=-1;
 #endif
 /* Pose suavizada: pet_core da el objetivo de cada estado y los muelles lo siguen.
  * breath (0..1) mezcla la respiración de reposo, que así entra y sale sin saltos. */
@@ -181,12 +181,13 @@ static void snapshot(void){
     usb_serial_jtag_write_bytes("SNAP END\n",9,portMAX_DELAY);lv_draw_buf_destroy(buf);
 #endif
 }
+#define CALM_PERIOD_MS 55   /* ≈18 fps para la respiración en reposo */
 static void motion_init(void){
-    /* Frecuencia (Hz) y amortiguamiento de cada muelle: el cuerpo responde con un poco de
-     * rebote, los ojos parpadean rápido y la respiración entra y sale despacio. */
-    pet_spring_init(&s_scale_x,1,4,.55f);pet_spring_init(&s_scale_y,1,4,.55f);
-    pet_spring_init(&s_offset,0,2.5f,.7f);pet_spring_init(&s_rotation,0,1.8f,.6f);
-    pet_spring_init(&s_eye,1,9,.85f);pet_spring_init(&s_look,0,3,.8f);pet_spring_init(&s_breath,0,.8f,1);
+    /* Muelles críticos (sin rebote): un cambio de estado recorre el 95 % del camino en
+     * 320 ms con forma de S; los ojos, en 110 ms; la respiración entra y sale en 400 ms. */
+    pet_spring_init_settle(&s_scale_x,1,.32f);pet_spring_init_settle(&s_scale_y,1,.32f);
+    pet_spring_init_settle(&s_offset,0,.32f);pet_spring_init_settle(&s_rotation,0,.32f);
+    pet_spring_init_settle(&s_eye,1,.11f);pet_spring_init_settle(&s_look,0,.32f);pet_spring_init_settle(&s_breath,0,.4f);
 }
 /* Sigue la pose de pet_core con los muelles. En reposo pet_core sube y baja el orb a
  * saltos de 1 px; aquí se cambia por una respiración continua de escala. */
@@ -198,15 +199,15 @@ static void motion_step(const pet_pose_t *p,int64_t now_us){
     pet_spring_t *all[]={&s_scale_x,&s_scale_y,&s_offset,&s_rotation,&s_eye,&s_look,&s_breath};
     for(unsigned i=0;i<sizeof(all)/sizeof(all[0]);i++)pet_spring_step(all[i],dt);
 }
-/* Respiración: la misma frecuencia que pet_core (1,3 rad/s). La fase se toma sobre su
- * propio periodo (4,833 s) para que no salte al dar la vuelta ningún contador. */
-#define BREATH_PERIOD_US 4833219
+/* Respiración: ciclo de 4 s, solo escala. La fase se toma sobre su propio periodo para
+ * que no salte al dar la vuelta ningún contador. Es un seno: ease-in-out por sí mismo. */
+#define BREATH_PERIOD_US 4000000
 static float breath(int64_t now_us){return s_breath.value*sinf((float)(now_us%BREATH_PERIOD_US)/BREATH_PERIOD_US*6.2831853f);}
-/* Mezcla entre el color del orb y el de sin conexión, con --ease-io2 en 600 ms. */
+/* Mezcla entre el color del orb y el de sin conexión, con --ease-io3 (Cubic) en 320 ms. */
 static int offline_mix(bool offline,int64_t now_us){
     float now=(float)(now_us%600000000)/1e6f;
     if(offline!=offline_shown){
-        offline_shown=offline;pet_tween_start(&offline_tween,pet_tween_value(&offline_tween,now),offline?1:0,now,.6f);
+        offline_shown=offline;pet_tween_start_curve(&offline_tween,PET_EASE_IO3,pet_tween_value(&offline_tween,now),offline?1:0,now,.32f);
     }
     return (int)lroundf(pet_tween_value(&offline_tween,now)*255);
 }
@@ -237,7 +238,7 @@ static void pixel_orb(uint8_t *buf,float sx,float sy,float offset,float rotation
 }
 #endif
 static void draw(lv_timer_t *timer){
-    (void)timer;pet_ui_view_t current;
+    pet_ui_view_t current;
     xSemaphoreTake(view_lock,portMAX_DELAY);current=view;
     int next=requested_page;requested_page=-1;bool snap=snapshot_requested;snapshot_requested=false;
     xSemaphoreGive(view_lock);
@@ -284,10 +285,11 @@ static void draw(lv_timer_t *timer){
     for(unsigned i=0;i<2;i++){
         int x=(int)lroundf(224*(i?.5223f:.2411f)+s_look.value);
         lv_obj_set_pos(eyes[i],x,95-eye_h/2);lv_obj_set_height(eyes[i],eye_h);
-        lv_obj_set_style_transform_pivot_y(eyes[i],eye_h/2,0);
+        if(eye_h!=last_eye_h)lv_obj_set_style_transform_pivot_y(eyes[i],eye_h/2,0);
         lv_obj_set_flag(eyes[i],LV_OBJ_FLAG_HIDDEN,smile);
         lv_obj_set_pos(smiles[i],x-6,65);lv_obj_set_flag(smiles[i],LV_OBJ_FLAG_HIDDEN,!smile);
     }
+    last_eye_h=eye_h;
 #endif
     const char *text=current.captions?current.caption:"";
     if(current.dialogue==PET_DIALOGUE_LISTEN)text=PET_STR_LISTEN;
@@ -321,6 +323,15 @@ static void draw(lv_timer_t *timer){
         lv_obj_t *target=header_labels[page-1];
         if(strcmp(lv_label_get_text(target),header))lv_label_set_text(target,header);
     }
+    /* Reposo: solo respira. El dibujo baja a unos 18 fps; con cualquier cambio vuelve
+     * al refresco normal en el siguiente fotograma. */
+    bool calm=p.expression==PET_EXPR_IDLE&&current.dialogue==PET_DIALOGUE_IDLE&&!touching&&
+        pet_spring_settled(&s_scale_x,.002f)&&pet_spring_settled(&s_scale_y,.002f)&&pet_spring_settled(&s_offset,.2f)&&
+        pet_spring_settled(&s_rotation,.05f)&&pet_spring_settled(&s_eye,.01f)&&pet_spring_settled(&s_look,.2f)&&
+        pet_spring_settled(&s_breath,.01f)&&(mix==0||mix==255);
+    static uint32_t draw_period=LV_DEF_REFR_PERIOD;
+    uint32_t period=calm?CALM_PERIOD_MS:LV_DEF_REFR_PERIOD;
+    if(timer&&period!=draw_period){draw_period=period;lv_timer_set_period(timer,period);}
     if(snap)snapshot();
 }
 static void build(void){
