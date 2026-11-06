@@ -245,7 +245,7 @@ Cada fase es una PR pequeña contra `main`. Las fases 1 a 6 se comprueban **sin 
 
 Las fases 1–2 y 3–6 son independientes y pueden avanzar en paralelo.
 
-**Solapamiento con la PR #1.** La rama `claude/port-175c-es` (PR #1, abierta antes que este plan) ya hace en un solo bloque buena parte de las fases 1 a 6: placa 1.75C, particiones, instalador, fuente latina y textos en español, además de su propio `docs/PORT_1.75C.md`. Antes de seguir con más fases hay que decidir cuál de las dos ramas manda, para que no choquen al fusionar.
+**Solapamiento con la PR #1.** La rama `claude/port-175c-es` (PR #1, abierta antes que este plan) ya hace en un solo bloque buena parte de las fases 1 a 6: placa 1.75C, particiones, instalador, fuente latina y textos en español, además de su propio `docs/PORT_1.75C.md`. Decisión (2026-11-06): **manda la PR #1**. Este plan no sube código propio; la siguiente fase parte de lo que la PR #1 deje pendiente frente a las decisiones (§7).
 
 **Pruebas de aceptación.** Mientras sus frases sigan en chino, `live-acceptance.mjs` y `*-task-acceptance.mjs` fijan la voz a `zh`. Para `hardware-interrupt.mjs`, que usa un puente ya arrancado, hay que lanzar ese puente con `--language zh`.
 
@@ -331,3 +331,27 @@ Tomadas el 2026-11-06 en nombre de Ángel. Sustituyen a las recomendaciones de l
 | D9 | Batería | Se asume alimentación por USB; el AXP2101 en **solo lectura** y funcionando con o sin batería | Fase 4: `read_power` devuelve `battery_pct = -1` si no hay batería (bit de presencia del AXP2101) y no se escriben registros de carga ni de raíles. Si los códecs necesitan un raíl que llega apagado, se documenta y se decide antes de escribir nada |
 
 Ninguna fase de este plan flashea la placa ni ejecuta instaladores sobre ella. La fase 7 la hace Ángel a mano.
+
+---
+
+## 7. La PR #1 frente a este plan
+
+Revisión de solo lectura de `claude/port-175c-es` en `4c321c7`. No se ha compilado ni probado esa rama; solo se ha leído el diff.
+
+| Punto | Decisión o plan | PR #1 | Estado |
+|---|---|---|---|
+| Bot por defecto (D2) | «Grok Orb», `--bot` y `GROK_BOT_NAME` | `--bot` y `GROK_BOT_NAME`, pero por defecto sigue `小糖` | **Pendiente**: cambiar el valor por defecto |
+| Nombre en pantalla (D2) | `CONFIG_PET_DISPLAY_NAME`, «Grok Orb» por defecto | «Grok Orb» fijo en `pet_ui.c` | **Pendiente**: llevarlo a Kconfig |
+| Idioma de la interfaz (D3) | Kconfig `PET_LANG_ES`/`_ZH`, sin CJK en español | Español fijo; `muse_font_cjk_16.c` sigue compilándose siempre | **Pendiente** |
+| Hora (D4) | Desfase desde el Mac | `offsetMin` en `clock`; sin él, la placa usa +8 h | Cumple. Mismo diseño con otro nombre de campo (`offsetMin`) |
+| Tabla de particiones (§2.1, D6) | 32 MB, ranuras de ~8 MB, `coredump`, `storage`, `prod_data`/`prod_bak` | Cabecera de 16 MB, dos ranuras de 6 MB, resto sin tocar; **sin `prod_data`/`prod_bak`** | **Pendiente**: añadir `prod_data`/`prod_bak` (D6). Que la cabecera sea de 16 MB, para que también arranque en placas de 16 MB, es aceptable si Ángel lo da por bueno |
+| AXP2101 (D9) | Solo lectura, con o sin batería | Escribe ALDO1 a 3,3 V, lo enciende y activa el ADC de batería | **No cumple D9**. O se quita la escritura, o se confirma con el esquemático que ALDO1 es solo el micro y Ángel acepta la excepción |
+| Tabla de origen (D5) | No suponer ninguna; leerla de la copia | Compara los primeros 0x9000 bytes de la placa con la copia: no supone contenido, pero sí que el bootloader y la tabla de fábrica caben por debajo de 0x9000 | Cumple casi siempre. Revisar cuando exista la copia real |
+| Instalador (§2.2) | Perfiles, copia completa, primera instalación completa y restauración | Perfiles por placa, copia de 16 o 32 MB, `full_install` para la 1.75C, tests en `tests/pet_install_175c_test.py` | Cumple en diseño; revisar los tests |
+| Página de configuración Wi-Fi | Script que el navegador pueda parsear | Arreglado, con test | Cumple |
+| Apagar con PWR (D8) | Solo pulsación larga del PMU | Sin `power_off` por software; el AXP2101 apaga con su tecla | Cumple |
+
+Siguiente fase propuesta, sin tocar la placa: una PR pequeña sobre la rama de la PR #1 (o tras fusionarla) con los cuatro pendientes de arriba: bot por defecto, `CONFIG_PET_DISPLAY_NAME`, `CONFIG_PET_LANG_*` sin CJK en español, y `prod_data`/`prod_bak`. El AXP2101 queda a la espera de la decisión sobre D9.
+
+El trabajo de la fase 1 de esta rama (`src/locale.mjs` con `--language` y `--time-zone`, y los tests de cambio de hora) se ha guardado en la rama local `claude/plan-port-1-75c-fase1-local`, sin subir, por si sirve de referencia.
+
