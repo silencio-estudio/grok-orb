@@ -178,7 +178,7 @@ static void advance(uint64_t ms){
 static int shots(const char *dir){
     mkdir(dir,0755);
     for(int i=0;i<S_COUNT;i++){
-        virtual_ms+=60000;apply_scene((scene_t)i);advance(1400);
+        virtual_ms+=60000;apply_scene((scene_t)i);advance(i==S_OFFLINE?10600:1400);   /* pet_ui marca «sin conexión» tras 10 s */
         char path[512];snprintf(path,sizeof(path),"%s/%s.png",dir,scenes[i].id);
         if(capture(path))return 1;
     }

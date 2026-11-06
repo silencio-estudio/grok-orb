@@ -30,6 +30,8 @@ static bool snapshot_requested;
 static int touch_x,touch_y;
 static bool touching;
 static char last_caption[321],last_hint[64];
+static int64_t lost_at;
+static bool offline_shown;
 static lv_obj_t *voice_hint;
 static void action(pet_ui_action_kind_t kind,int value){if(callback)callback((pet_ui_action_t){kind,value},callback_context);}
 static lv_obj_t *label(lv_obj_t *parent,const char *text,int width){
@@ -144,7 +146,13 @@ static void draw(lv_timer_t *timer){
     else if(current.dialogue==PET_DIALOGUE_IDLE)text="";
     if(strcmp(last_caption,text)){snprintf(last_caption,sizeof(last_caption),"%s",text);lv_label_set_text(caption,last_caption);}
     lv_obj_set_flag(caption,LV_OBJ_FLAG_HIDDEN,!text[0]);
-    const char *hint=current.connection==PET_CONN_READY?PET_STR_HINT_TALK:PET_STR_HINT_CONNECTING;
+    /* Sin conexión solo tras 10 s seguidos sin enlace: al arrancar y en cada reintento
+     * pet_link alterna CONNECTING y OFFLINE, y el orb no debe parpadear. */
+    int64_t now=esp_timer_get_time();
+    if(current.connection==PET_CONN_READY)lost_at=0;else if(!lost_at)lost_at=now;
+    bool offline=lost_at&&now-lost_at>=10000000;
+    if(offline!=offline_shown){offline_shown=offline;lv_obj_set_style_bg_color(body,lv_color_hex(offline?0x6b6267:0xfa2c99),0);}
+    const char *hint=current.connection==PET_CONN_READY?PET_STR_HINT_TALK:offline?PET_STR_OFFLINE:PET_STR_HINT_CONNECTING;
     if(current.dialogue==PET_DIALOGUE_LISTEN)hint=PET_STR_HINT_RELEASE;
     else if(current.connection==PET_CONN_READY&&current.dialogue!=PET_DIALOGUE_IDLE)hint=PET_STR_HINT_INTERRUPT;
     if(strcmp(last_hint,hint)){snprintf(last_hint,sizeof(last_hint),"%s",hint);lv_label_set_text(voice_hint,last_hint);}
