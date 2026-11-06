@@ -33,3 +33,12 @@ Montserrat 16 → this font → `muse_font_cjk_16`. Conversion options are in th
 file header; source TTF and license are in
 [THIRD_PARTY_NOTICES](../../../../../THIRD_PARTY_NOTICES.md) and
 [Montserrat-OFL-1.1](../../../../../docs/third-party/Montserrat-OFL-1.1.txt).
+
+# Pixel font (8-bit theme)
+
+`pet_font_pixel_16.c` holds GNU Unifont 16.0.04, 16 px, 1 bpp glyphs for
+U+0020–007E, U+00A0–00FF and – — ‘ ’ “ ” … €, so the 8-bit theme
+(`CONFIG_PET_THEME_PIXEL`) shows pixel text with Spanish accents. It is only
+linked in that theme; Chinese builds chain it to `muse_font_cjk_16`, also
+Unifont. Same upstream OTF and SHA-256 as above, same OFL-1.1 terms; the
+conversion options and the `lv_font_conv` commit are in the file header.

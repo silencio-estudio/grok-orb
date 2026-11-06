@@ -70,6 +70,27 @@ Diferencias con la placa:
 - **No se simulan** el audio, la red, el Bluetooth ni la NVS. Los textos de estado de red son los mismos que escribe `pet_app.c`.
 - El volcado por USB de `pet.snapshot` se descarta; para capturas usa `S` o `--shots`.
 
+## Temas
+
+`CONFIG_PET_THEME_SMOOTH` (por defecto) o `CONFIG_PET_THEME_PIXEL`, en `menuconfig` → *Grok pet interface* → *Theme*. En el simulador se elige con `--theme pixel` (`npm run sim -- --theme pixel`), que compila un binario aparte. `npm run sim:shots` y `npm run sim:test` hacen los dos temas: capturas del suave en `docs/sim/` y del de 8 bits en `docs/sim/pixel/`.
+
+| | Suave | 8 bits |
+|---|---|---|
+| Orb | Círculo con suavizado, escalado por debajo del píxel | 32×32 bloques de 8 px sin suavizado, con brillo arriba a la izquierda |
+| Movimiento | Muelles a cada fotograma (60 Hz en el Mac, 30 en la placa) | Los mismos muelles, pero el orb se redibuja 8 veces por segundo |
+| Texto | Montserrat 16 con suavizado | Unifont 16 px de 1 bit |
+| Paleta | La de siempre | 4 colores: fondo, rosa del orb, rosa claro y gris cálido |
+| Controles | Redondeados | Rectos, con borde rosa en los botones |
+
+## Movimiento
+
+Común a los dos temas (`firmware/pet/components/pet_ui/pet_motion.c`):
+
+- **Muelles:** escala, altura, giro, ojos y mirada siguen la pose que da `pet_core` con muelles amortiguados. Al cambiar de estado a mitad de un movimiento conservan la velocidad, así que las transiciones se encadenan sin saltos.
+- **Respiración continua en reposo:** sustituye a los saltos de 1 px. Se hace con `transform_scale`, por debajo del píxel, y entra y sale con su propio muelle.
+- **Parpadeo:** los ojos se cierran hacia su centro. La sonrisa (feliz o dormido) aparece cuando los ojos ya se han cerrado.
+- **Sin conexión:** el color pasa del rosa al gris con `--ease-io2` (`cubic-bezier(0.455, 0.03, 0.515, 0.955)`) en 600 ms.
+
 ## Fluidez y coste en la placa
 
 La ventana refresca a 60 Hz con vsync (`LV_DEF_REFR_PERIOD 16` en `lv_conf.h`); la placa sigue a 33 ms. LVGL solo pinta cuando algo cambia, así que `--fps` cuenta fotogramas con cambios: en reposo la respiración mueve el orb a saltos de 1 px unas pocas veces por segundo, y eso es lo que se ve también en la placa.

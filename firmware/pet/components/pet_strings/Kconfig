@@ -13,6 +13,21 @@ menu "Grok pet interface"
             bool "Chinese (adds the CJK font)"
     endchoice
 
+    choice PET_THEME
+        prompt "Theme"
+        default PET_THEME_SMOOTH
+        help
+            Smooth: the round pink orb with anti-aliased Montserrat text.
+            8-bit: four colours from the same palette, Unifont pixel text,
+            square widgets and an orb drawn in 8 px blocks at 8 frames/s.
+            Both use the same spring-based motion.
+
+        config PET_THEME_SMOOTH
+            bool "Smooth"
+        config PET_THEME_PIXEL
+            bool "8-bit"
+    endchoice
+
     config PET_DISPLAY_NAME
         string "Name shown on screen"
         default "Grok Orb"
