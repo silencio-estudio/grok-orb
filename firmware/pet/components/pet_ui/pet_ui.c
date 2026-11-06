@@ -69,7 +69,7 @@ static void slider_changed(lv_event_t *event){
     if(lv_event_get_code(event)==LV_EVENT_VALUE_CHANGED)action(o==volume_slider?PET_UI_VOLUME:PET_UI_BRIGHTNESS,lv_slider_get_value(o));
 }
 static lv_obj_t *slider(lv_obj_t *parent,const char *text,int y,int min,int max){
-    lv_obj_t *txt=label(parent,text,100);lv_obj_set_pos(txt,110,y);
+    lv_obj_t *txt=label(parent,text,220);lv_obj_set_style_text_align(txt,LV_TEXT_ALIGN_LEFT,0);lv_obj_set_pos(txt,123,y);
     lv_obj_t *s=lv_slider_create(parent);lv_obj_set_size(s,220,8);lv_obj_set_pos(s,123,y+33);
     lv_slider_set_range(s,min,max);lv_obj_set_style_bg_color(s,lv_color_hex(0x4b3341),LV_PART_MAIN);
     lv_obj_set_style_bg_color(s,lv_color_hex(0xfa2c99),LV_PART_INDICATOR);
@@ -83,8 +83,9 @@ static void switch_changed(lv_event_t *event){
     action(kind,lv_obj_has_state(o,LV_STATE_CHECKED));
 }
 static lv_obj_t *toggle(lv_obj_t *parent,const char *text,int y){
-    lv_obj_t *txt=label(parent,text,160);lv_obj_set_pos(txt,105,y+4);
-    lv_obj_t *o=lv_switch_create(parent);lv_obj_set_size(o,48,25);lv_obj_set_pos(o,280,y);
+    lv_obj_t *txt=label(parent,text,160);lv_obj_set_style_text_align(txt,LV_TEXT_ALIGN_LEFT,0);lv_obj_set_pos(txt,123,y+4);
+    /* Borde derecho del interruptor (295+48) alineado con el de los deslizadores (123+220). */
+    lv_obj_t *o=lv_switch_create(parent);lv_obj_set_size(o,48,25);lv_obj_set_pos(o,295,y);
     lv_obj_set_style_bg_color(o,lv_color_hex(0xfa2c99),LV_PART_INDICATOR|LV_STATE_CHECKED);
     lv_obj_add_event_cb(o,switch_changed,LV_EVENT_VALUE_CHANGED,NULL);return o;
 }
@@ -167,7 +168,8 @@ static void draw(lv_timer_t *timer){
         char code[32];if(current.passkey)snprintf(code,sizeof(code),PET_STR_PASSKEY_FMT,current.passkey);else code[0]=0;
         lv_label_set_text(passkey_label,code);
     }
-    char battery[32];if(current.battery>=0)snprintf(battery,sizeof(battery),PET_STR_BATTERY_FMT,current.battery);else snprintf(battery,sizeof(battery),"%s",PET_DISPLAY_NAME);
+    /* Encima de «Ajustes» solo la batería, y solo si hay batería. */
+    char battery[32];if(current.battery>=0)snprintf(battery,sizeof(battery),PET_STR_BATTERY_FMT,current.battery);else battery[0]=0;
     if(page)lv_label_set_text(power_label,battery);
     if(snap)snapshot();
 }
