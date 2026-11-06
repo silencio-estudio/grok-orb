@@ -235,8 +235,8 @@ El bot por defecto es **«Grok Orb»** (decisión D2): sin `--bot` ni
   La fuente CJK de Unifont (`muse_font_cjk_16.c`) **solo se compila en el build
   en chino**; en español no entra en el binario.
 - **Nombre en pantalla** con `CONFIG_PET_DISPLAY_NAME` (mismo menú), «Grok Orb»
-  por defecto. Aparece en gris encima del título de Ajustes y de «Conexión y
-  red», con «· 80 %» si hay batería; la pantalla principal del orb no lo lleva.
+  por defecto. Es el título único de Ajustes y de la pantalla de conexión, con
+  «· 80 %» en la misma línea si hay batería; la pantalla principal no lo lleva.
 
 ## Pendiente de comprobar en la placa
 

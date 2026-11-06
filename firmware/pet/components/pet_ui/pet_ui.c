@@ -67,7 +67,7 @@ static lv_obj_t *root,*body,*caption,*handle,*drawer,*connection_page;
 static lv_obj_t *eyes[2],*smiles[2];   /* en el tema de 8 bits los ojos van dibujados en el lienzo */
 #endif
 static lv_obj_t *volume_slider,*brightness_slider,*quiet_switch,*captions_switch,*speaker_switch;
-static lv_obj_t *network_label,*bridge_label,*voice_label,*setup_label,*passkey_label,*header_labels[2];
+static lv_obj_t *network_label,*bridge_label,*voice_label,*setup_label,*passkey_label,*titles[2];
 static bool initialized,screen_on=true,syncing;
 /* Últimos valores enviados: los estilos de transformación de LVGL invalidan el objeto
  * aunque no cambien, y el brillo es un comando por QSPI. Valores imposibles = aún no enviado. */
@@ -330,13 +330,13 @@ static void draw(lv_timer_t *timer){
         char code[32];if(current.passkey)snprintf(code,sizeof(code),PET_STR_PASSKEY_FMT,current.passkey);else code[0]=0;
         lv_label_set_text(passkey_label,code);
     }
-    /* Cabecera de Ajustes y de Conexión: el nombre del orb y, si hay batería, su nivel.
-     * La pantalla principal no lo lleva. */
+    /* Título único de Ajustes y de Conexión: el nombre del orb y, si hay batería, su nivel
+     * en la misma línea. La pantalla principal no lo lleva. */
     if(page){
         char header[64];
         if(current.battery>=0)snprintf(header,sizeof(header),PET_STR_HEADER_BATTERY_FMT,PET_DISPLAY_NAME,current.battery);
         else snprintf(header,sizeof(header),"%s",PET_DISPLAY_NAME);
-        lv_obj_t *target=header_labels[page-1];
+        lv_obj_t *target=titles[page-1];
         if(strcmp(lv_label_get_text(target),header))lv_label_set_text(target,header);
     }
     /* Reposo: solo respira. El dibujo baja a unos 18 fps; con cualquier cambio vuelve
@@ -384,12 +384,12 @@ static void build(void){
     lv_obj_t *bar=lv_obj_create(handle);lv_obj_remove_style_all(bar);lv_obj_set_size(bar,34,3);lv_obj_center(bar);
     lv_obj_set_style_bg_color(bar,lv_color_hex(C_BAR),0);lv_obj_set_style_bg_opa(bar,LV_OPA_COVER,0);lv_obj_set_style_radius(bar,RADIUS(2),0);lv_obj_remove_flag(bar,LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(handle,open_drawer,LV_EVENT_CLICKED,NULL);
-    drawer=overlay();lv_obj_t *title=label(drawer,PET_STR_SETTINGS,200);lv_obj_set_pos(title,133,63);lv_obj_set_style_text_font(title,&title_font,0);
+    drawer=overlay();titles[0]=label(drawer,PET_DISPLAY_NAME,260);lv_obj_set_pos(titles[0],103,63);lv_obj_set_style_text_font(titles[0],&title_font,0);
     volume_slider=slider(drawer,PET_STR_VOLUME,102,0,100);brightness_slider=slider(drawer,PET_STR_BRIGHTNESS,164,10,100);
     quiet_switch=toggle(drawer,PET_STR_QUIET,225);captions_switch=toggle(drawer,PET_STR_CAPTIONS,265);speaker_switch=toggle(drawer,PET_STR_SPEAKER,305);
     lv_obj_t *connection=button(drawer,PET_STR_CONNECTION,170,connections);lv_obj_set_pos(connection,148,350);
     lv_obj_t *back=button(drawer,PET_STR_BACK,90,home);lv_obj_set_pos(back,188,402);
-    connection_page=overlay();title=label(connection_page,PET_STR_CONNECTION,240);lv_obj_set_pos(title,113,58);lv_obj_set_style_text_font(title,&title_font,0);
+    connection_page=overlay();titles[1]=label(connection_page,PET_DISPLAY_NAME,260);lv_obj_set_pos(titles[1],103,58);lv_obj_set_style_text_font(titles[1],&title_font,0);
     network_label=label(connection_page,"",290);lv_obj_set_pos(network_label,88,106);
     bridge_label=label(connection_page,"",290);lv_obj_set_pos(bridge_label,88,143);
     voice_label=label(connection_page,"",290);lv_obj_set_pos(voice_label,88,180);
@@ -398,12 +398,6 @@ static void build(void){
     lv_obj_t *setup=button(connection_page,PET_STR_SETUP_BLE,230,provision);lv_obj_set_pos(setup,118,294);
     lv_obj_t *stop=button(connection_page,PET_STR_SETUP_CLOSE,200,close_provision);lv_obj_set_pos(stop,133,345);
     back=button(connection_page,PET_STR_BACK_HOME,120,home);lv_obj_set_pos(back,173,396);
-    /* Línea pequeña en gris encima del título, igual en las dos páginas. */
-    lv_obj_t *pages[2]={drawer,connection_page};
-    for(int i=0;i<2;i++){
-        header_labels[i]=label(pages[i],PET_DISPLAY_NAME,260);lv_obj_set_pos(header_labels[i],103,30);
-        lv_obj_set_style_text_color(header_labels[i],lv_color_hex(C_HINT),0);
-    }
     /* Un dibujo por refresco de pantalla (33 ms en la placa, CONFIG_LV_DEF_REFR_PERIOD). */
     lv_timer_create(draw,LV_DEF_REFR_PERIOD,NULL);
 }
