@@ -7,12 +7,13 @@ import { startControlServer } from './control.mjs';
 import { startDeviceServer } from './device-server.mjs';
 import { deviceConfig,pairingConfig } from './device-config.mjs';
 import { startDiscovery } from './discovery.mjs';
+import { DEFAULT_BOT } from './locale.mjs';
 
 const args = process.argv.slice(2);
 function option(name) { const index = args.indexOf(name); return index < 0 ? undefined : args[index + 1]; }
 const mode = args[0] && !args[0].startsWith('-') ? args[0] : 'serve';
 if (args.includes('--help') || args.includes('-h')) {
-  console.log('npm start -- serve --bot "Your Bot" [--port 8788] [--input DEVICE_ID] [--output DEVICE_ID]\nCommands: doctor, bots, serve, device\nEnvironment: GROK_LANGUAGE=es|en|zh (default es), GROK_TIMEZONE=<IANA zone> (default Europe/Madrid)\nMac microphone and native Grok Bot voice; no transcripts or credentials are logged.');
+  console.log('npm start -- serve [--bot "Grok Orb"] [--port 8788] [--input DEVICE_ID] [--output DEVICE_ID]\nCommands: doctor, bots, serve, device\nEnvironment: GROK_BOT_NAME (default Grok Orb), GROK_LANGUAGE=es|en|zh (default es), GROK_TIMEZONE=<IANA zone> (default Europe/Madrid)\nMac microphone and native Grok Bot voice; no transcripts or credentials are logged.');
 } else {
   try {
     if (mode === 'doctor') {
@@ -31,7 +32,7 @@ if (args.includes('--help') || args.includes('-h')) {
 
 async function serve(backend, bots) {
   buildAudio();
-  let bot = bots.find(item => item.name === (option('--bot') ?? process.env.GROK_BOT_NAME ?? '小糖'));
+  let bot = bots.find(item => item.name === (option('--bot') ?? process.env.GROK_BOT_NAME ?? DEFAULT_BOT));
   if (!bot) throw new Error('BOT_NOT_FOUND');
   const controller = new VoiceController({ backend, bots, bot, audioOptions: { input: option('--input'), output: option('--output') } });
   const server = await startControlServer({ port: Number(option('--port') ?? 8788),
@@ -43,7 +44,7 @@ async function serve(backend, bots) {
 }
 
 async function device(backend, bots) {
-  const matches = bots.filter(bot => bot.name === (option('--bot') ?? process.env.GROK_BOT_NAME ?? '小糖'));
+  const matches = bots.filter(bot => bot.name === (option('--bot') ?? process.env.GROK_BOT_NAME ?? DEFAULT_BOT));
   if (matches.length !== 1) throw new Error('BOT_NOT_UNIQUE');
   const bot = matches[0], config = await deviceConfig();
   const bridge = await startDeviceServer({ backend, bot, key: Buffer.from(config.key, 'hex'), host:'0.0.0.0', port: config.port,bridgeId:config.bridgeId });
